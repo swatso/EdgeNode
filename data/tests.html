@@ -1,0 +1,183 @@
+  <!DOCTYPE html> 
+  <html>
+  	<head>
+ 	  	<meta name="viewport" content="width=device-width, initial-scale=1">
+  		<title>Breaker</title>
+  		<link rel="shortcut icon" href="/favicon">
+  		<style>
+  		    <meta name="viewport" content="width=device-width, initial-scale=1">
+  			html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}
+  			body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;} h3 {color: #444444;margin-bottom: 50px;}
+  			p {font-size: 14px;color: #888;margin-bottom: 10px;}
+  		</style>
+
+  	</head>
+  	<body>
+  	  	<h1>Breaker</h1>
+  		<h3>Available Tests</h3>
+  		</br>
+
+  		FirstServo:
+  		    	<input type="radio" name= "bit00" Id="bit00_0" value="0" onclick="postValue('bit00_0')" />Min
+    			<input type="radio" name= "bit00" Id="bit00_1" value="1" onclick="postValue('bit00_1')" />Mid
+    			<input type="radio" name= "bit00" Id="bit00_2" value="2" onclick="postValue('bit00_2')" />Max
+    			<br><br>
+
+     			  		 
+  		<h3>Available Sounds</h3>
+  		</br>
+
+  		001 Ambient1:
+    			<input type="radio" name= "track001" Id="001_0" value="0" onclick="postControl('001_0')" %001_0%/>Off
+    			<input type="radio" name= "track001" Id="001_1" value="1" onclick="postControl('001_1')" %001_1%/>On
+    			<input type="radio" name= "track001" Id="001_2" value="2" onclick="postControl('001_2')" %001_2%/>Repeat
+    			<br><br>
+
+  		002 Ambient2:
+    			<input type="radio" name= "track002" Id="002_0" value="0" onclick="postControl('002_0')" %002_0%/>Off
+    			<input type="radio" name= "track002" Id="002_1" value="1" onclick="postControl('002_1')" %002_1%/>On
+    			<input type="radio" name= "track002" Id="002_2" value="2" onclick="postControl('002_2')" %002_2%/>Repeat
+    			<br><br>
+
+  		003 Ambient3:
+    			<input type="radio" name= "track003" Id="003_0" value="0" onclick="postControl('003_0')" %003_0%/>Off
+    			<input type="radio" name= "track003" Id="003_1" value="1" onclick="postControl('003_1')" %003_1%/>On
+    			<input type="radio" name= "track003" Id="003_2" value="2" onclick="postControl('003_2')" %003_2%/>Repeat
+    			<br><br>
+			
+		004 Siren:
+    			<input type="radio" name= "track004" Id="004_0" value="0" onclick="postControl('004_0')" %004_0%/>Off
+    			<input type="radio" name= "track004" Id="004_1" value="1" onclick="postControl('004_1')" %004_1%/>On
+    			<input type="radio" name= "track004" Id="004_2" value="2" onclick="postControl('004_2')" %004_2%/>Repeat
+    			<br><br>
+    			
+    		005 Train Bell:
+    			<input type="radio" name= "track005" Id="005_0" value="0" onclick="postControl('005_0')" %005_0%/>Off
+    			<input type="radio" name= "track005" Id="005_1" value="1" onclick="postControl('005_1')" %005_1%/>On
+    			<input type="radio" name= "track005" Id="005_2" value="2" onclick="postControl('005_2')" %005_2%/>Repeat
+    			<br><br>
+			
+		006 Siren Low:
+    			<input type="radio" name= "track006" Id="006_0" value="0" onclick="postControl('006_0')" %006_0%/>Off
+    			<input type="radio" name= "track006" Id="006_1" value="1" onclick="postControl('006_1')" %006_1%/>On
+    			<input type="radio" name= "track006" Id="006_2" value="2" onclick="postControl('006_2')" %006_2%/>Repeat
+    			<br><br>
+			
+		007 Whistle:
+    			<input type="radio" name= "track007" Id="007_0" value="0" onclick="postControl('007_0')" %007_0%/>Off
+    			<input type="radio" name= "track007" Id="007_1" value="1" onclick="postControl('007_1')" %007_1%/>On
+    			<input type="radio" name= "track007" Id="007_2" value="2" onclick="postControl('007_2')" %007_2%/>Repeat
+    			<br><br>
+    			
+    		008 Whistle:
+    			<input type="radio" name= "track008" Id="008_0" value="0" onclick="postControl('008_0')" %008_0%/>Off
+    			<input type="radio" name= "track008" Id="008_1" value="1" onclick="postControl('008_1')" %008_1%/>On
+    			<input type="radio" name= "track008" Id="008_2" value="2" onclick="postControl('008_2')" %008_2%/>Repeat
+    			<br><br>
+    			
+    		009 Horn:
+    			<input type="radio" name= "track009" Id="009_0" value="0" onclick="postControl('009_0')" %009_0%/>Off
+    			<input type="radio" name= "track009" Id="009_1" value="1" onclick="postControl('009_1')" %009_1%/>On
+    			<input type="radio" name= "track009" Id="009_2" value="2" onclick="postControl('009_2')" %009_2%/>Repeat
+    			<br><br>
+    			
+    		010 LoudAmbient:
+    			<input type="radio" name= "track010" Id="010_0" value="0" onclick="postControl('010_0')" %010_0%/>Off
+    			<input type="radio" name= "track010" Id="010_1" value="1" onclick="postControl('010_1')" %010_1%/>On
+    			<input type="radio" name= "track010" Id="010_2" value="2" onclick="postControl('010_2')" %010_2%/>Repeat
+    			<br><br>    			
+    			
+  		<a href='http://breaker.local/'>Main Scenes</a>
+  		<a href='http://breaker.local/page/config'>Configuration</a><br></br><br></br>
+
+  		<script>
+	  		async function postButton(buttonNo) 
+			{
+  				var url = "//"+window.location.host+"/api/button";
+  				const response = await fetch(url, 
+  				{
+    					method: "POST",
+    					body: JSON.stringify(
+    					{
+      						button: buttonNo
+    					}),
+    					headers: 
+    					{
+      						"Content-type": "application/json; charset=UTF-8"
+    					}
+  				});
+			};
+
+	  		async function postControl(ID) 
+			{
+			   //document.getElementById(ID).checked = true;
+			
+  			   var url = "//"+window.location.host+"/api/";
+              		   var ele = document.getElementById(ID);
+              		   var out = '{"';
+              		   console.log("postControl");
+              		   console.log(name);
+              		   out = out + ele.name + '": ' + ele.value;
+            		   out = out + ' }';
+            		   url = url + ele.name
+  			   console.log(out);
+  			   const response = await fetch(url, 
+  			   {
+    			      method: "POST",
+    			         //body: JSON.stringify(out),
+    			         body: out,
+    			      headers: 
+    			      {
+      			         "Content-type": "application/json; charset=UTF-8"
+    			      }
+  			   });
+			};
+
+
+	  		async function postValue(ID) 
+			{
+              		   var ele = document.getElementById(ID);
+  			   var url = "//"+window.location.host+"/api/gpio/value/";
+            		   url = url + ele.name
+              		   var out = '{"value":' + ele.value + '}';
+              		   console.log("postValue");
+              		   console.log(name);
+  			   console.log(out);
+  			   const response = await fetch(url, 
+  			   {
+    			      method: "POST",
+    			         //body: JSON.stringify(out),
+    			         body: out,
+    			      headers: 
+    			      {
+      			         "Content-type": "application/json; charset=UTF-8"
+    			      }
+  			   });
+			};
+
+			setInterval(function() {
+  			   getStatus();}, 10000);
+
+			async function getStatus() 
+			{
+  			  const response = await fetch('/api/status');
+			  const data = await response.json();
+			  var resp = JSON.parse(JSON.stringify(data));	  			  			  			  				  			  			  
+			  document.getElementById("bit01_" + resp.servo1).checked = true;
+			  
+			  document.getElementById("001_" + resp.track001).checked = true;
+			  document.getElementById("002_" + resp.track002).checked = true;
+			  document.getElementById("003_" + resp.track003).checked = true;
+			  document.getElementById("004_" + resp.track004).checked = true;
+			  document.getElementById("005_" + resp.track005).checked = true;
+			  document.getElementById("006_" + resp.track006).checked = true;
+			  document.getElementById("007_" + resp.track007).checked = true;
+			  document.getElementById("008_" + resp.track008).checked = true;
+			  document.getElementById("009_" + resp.track009).checked = true;
+			  document.getElementById("010_" + resp.track010).checked = true;
+			  
+			};
+		</script>
+
+  	</body>
+  </html>

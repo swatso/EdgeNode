@@ -1,0 +1,173 @@
+  <!DOCTYPE html> 
+  <html>
+  	<head>
+	  	<meta name="viewport" content="width=device-width, initial-scale=1">
+  		<title>Action</title>
+  		<link rel="shortcut icon" href="/favicon">
+  		<style>
+			left-align {text-align: left;}
+  		    meta {content:"width=device-width, initial-scale=1"}
+  			html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: left;}
+  			body{margin-top: 50px;} h1 {color: #444444;margin: auto 30px;text-align: center;} h3 {color: #444444;margin-bottom: 20px;}
+  			p {font-size: 14px;color: #888;margin-bottom: 10px;}
+			table {border: 1px solid black;border-collapse: collapse;}
+			th, td {text-align: left;padding: 8px;}
+			tr:nth-child(odd) {background-color: #D6EEEE;}
+			td {border-bottom: 1px solid #444444;}
+  		</style>
+  		<script>
+
+			var number;
+			var name;
+			var volume;
+			var duration;
+			
+			async function init()
+			{
+console.log("init");
+
+				myUrl = new URL(window.location.toLocaleString()).searchParams;
+				number = myUrl.get('number');
+				getActionConfig();
+
+				const checkbox = document.querySelectorAll('input[type="checkbox"]');
+				checkbox.forEach(cb => {cb.addEventListener('change', checkboxChanged);});
+
+console.log("end of init");
+			};
+
+			async function checkboxChanged()
+			{
+				console.log("changed");
+				postActionConfig(number)
+			}
+
+			async function getActionConfig() 
+			{
+console.log("getActionConfig" + number);
+
+			  var response = await fetch("//"+window.location.host+"/api/action/config?number="+number);
+			  var data = await response.json();
+			  var resp = JSON.parse(JSON.stringify(data));
+
+			  ele = document.getElementById('currentAction');	
+	  		  ele.innerText = "Action:" + resp.number;
+			  ele = document.getElementById('state');	
+	  		  ele.innerText = "state:" + stateToText(resp.state);
+			  ele = document.getElementById('userState');
+			  ele.innerText = "UserState:" + resp.userState;
+			  ele = document.getElementById('userVar1');	
+	  		  ele.innerText = "UserVar1:" + resp.userVar1;
+			  ele = document.getElementById('userVar2');	
+	  		  ele.innerText = "UserVar2:" + resp.userVar2;
+			  ele = document.getElementById('enableRemote');	
+	  		  ele.checked = resp.enableRemote;
+			  ele = document.getElementById('enableLocal');	
+	  		  ele.checked = resp.enableLocal;
+			  setTimeout(getActionConfig, 5000); // Schedule next run
+			};
+
+			async function postActionConfig() 
+			{
+			   var enableRemote = document.getElementById('enableRemote');
+			   var enableLocal = document.getElementById('enableLocal');
+  			   var url = "//"+window.location.host+"/api/action/config";
+               var out = '{"number":' + number + ',';
+               out = out + '"enableRemote":' + enableRemote.checked + ',';
+               out = out + '"enableLocal":' + enableLocal.checked + ' }';
+ 			   postit(url,out);
+			};
+
+			async function playAction(loop)
+			{
+				console.log("play action "+number+" loop "+loop);
+				var url = "//"+window.location.host+"/api/action/play";
+				var out = '{"number":' +  number + ', "loop":' + loop + ' }';
+				console.log(out);
+ 			    postit(url,out);
+			};
+
+			async function stopAction()
+			{
+				console.log("stop action "+number);
+				var url = "//"+window.location.host+"/api/action/stop";
+				var out = '{"number":' +  number + ' }';
+				console.log(out);
+ 			    postit(url,out);
+			};
+
+			async function postit(url, content)
+  			{
+				console.log("postit " + url);
+  			   const response = await fetch(url, 
+			   {
+
+    			      method: "POST",
+    			         //body: JSON.stringify(content),
+    			         body: content,
+    			      headers: 
+    			      	 {"Content-type": "application/json; charset=UTF-8"}
+  			    });
+			}
+
+			function stateToText(type)
+			{
+				// converts an Action State Number to corresponding Text
+				if(type == 1)return("PLAYING");
+				if(type == 2)return("PLAYED");
+				if(type == 3)return("STOPPING");
+				if(type == 0)return("STOPPED");
+				return("NONE");
+			};
+
+		</script>
+  	</head>
+  	<body onload = "init()">
+		
+  		<h1><p font-size: 30 px;text-align: "centre";color: #444444; id="header";></p>Live Action</h1>
+
+		</br></br>
+
+			<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>
+			<tr>
+				<td width="17%"><span id="currentAction">-Loading</span></td>
+				<td width="17%"><span id="repeat"></span></td>
+				<td width="17%"><span id="state"></span></td>
+				<td width="15%"><span id="userState"></span></td>
+				<td width="17%"><span id="userVar1"></span></td>
+				<td width="17%"><span id="userVar2"></span></td>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction()">Stop</button></td>
+				<td width="15%"><span id="free"></span></td>
+			</tr>
+		</table>
+	</br></br>
+	<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>
+		<tr>
+			<td style="width:25%"><a href='/page/node'>node</a></td>
+			<td style="width:25%"><a href='/page/gpio'>gpio</a></td>
+			<td style="width:25%"><a href='/page/action'>action</a></td>
+			<td style="width:25%"><a href='/page/sound'>sound</a></td>
+		</tr>
+	</table>
+  	</body>
+  </html>
+  
+  
+  
+  
+  
+  

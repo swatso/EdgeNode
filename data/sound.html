@@ -1,0 +1,681 @@
+  <!DOCTYPE html> 
+  <html>
+  	<head>
+	  	<meta name="viewport" content="width=device-width, initial-scale=1">
+  		<title>MP3 Sound</title>
+  		<link rel="shortcut icon" href="/favicon">
+  		<style>
+			left-align {text-align: left;}
+  		    meta {content:"width=device-width, initial-scale=1"}
+  			html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: left;}
+  			body{margin-top: 50px;} h1 {color: #444444;margin: auto 30px;text-align: center;} h3 {color: #444444;margin-bottom: 20px;}
+  			p {font-size: 14px;color: #888;margin-bottom: 10px;}
+			table {border: 1px solid black;border-collapse: collapse;}
+			th, td {text-align: left;padding: 8px;}
+			tr:nth-child(odd) {background-color: #D6EEEE;}
+			td {border-bottom: 1px solid #444444;}
+  		</style>
+  		<script>
+
+			name = [];
+			volume = [];
+			duration = [];
+			
+			async function init()
+			{
+console.log("init");
+				getMP3PlayerStatus();
+
+				for(var i=0;i<16;i++)
+				{
+					getSoundTrackStatus(i);
+				}
+				const mp3Demands = document.querySelectorAll('input[id="manualTrimInput"], input[id="autoTrimInput"]');
+				mp3Demands.forEach(demand => {demand.addEventListener('change', trimChanged);});
+
+				const checkbox = document.querySelectorAll('input[type="checkbox"]');
+				checkbox.forEach(cb => {cb.addEventListener('change', checkboxChanged);});
+console.log("end of init");
+			};
+
+			async function checkboxChanged()
+			{
+				console.log("changed");
+				var number = this.id.slice(-2);
+				if (typeof number === "number")number = number*10+this.id.slice(-1);
+				postSoundTrackConfig(number)
+			}
+			
+			async function postMP3PlayerConfig() 
+			{
+console.log("postMP3PlayerConfig");
+
+			   var manualTrim = document.getElementById('manualTrimInput');
+			   var autoTrim = document.getElementById('autoTrimInput');
+  			   var url = "//"+window.location.host+"/api/mp3Player/config";
+			   var out = '{"manualTrim":' +  manualTrim.value + ',';
+			   out = out + '"autoTrim":' + autoTrim.value + ' }';
+ 			   postit(url,out);
+			};
+
+			async function getMP3PlayerStatus() 
+			{
+console.log("getMP3PlayerStatus");
+
+			  var response = await fetch("//"+window.location.host+"/api/mp3Player/status");
+			  var data = await response.json();
+			  var resp = JSON.parse(JSON.stringify(data));
+        	  var ele = document.getElementById('currentTrack');	
+			  if(resp.currentTrack == -1)ele.innerText = "No Track Playing";
+	  		  else ele.innerText = resp.currentTrack;
+
+			  ele = document.getElementById('currentVolume');	
+	  		  ele.innerText = resp.currentVolume;
+
+			  ele = document.getElementById('manualTrimInput');	
+	  		  ele.value = resp.manualTrim;
+
+			  ele = document.getElementById('autoTrimInput');	
+	  		  ele.value = resp.autoTrim;
+			};
+
+			async function getSoundTrackStatus(trackNo) 
+			{
+console.log("getSoundTrackStatus" + trackNo);
+
+			  var response = await fetch("//"+window.location.host+"/api/soundTrack/status?track="+trackNo);
+			  var data = await response.json();
+			  var resp = JSON.parse(JSON.stringify(data));
+        	  var ele = document.getElementById('name'+trackNo);
+			  name[trackNo] = resp.name;	
+	  		  ele.innerText = resp.name;
+
+			  ele = document.getElementById('volume'+trackNo);	
+			  volume[trackNo] = resp.volume;
+	  		  ele.innerText = resp.volume;
+
+			  ele = document.getElementById('duration'+trackNo);	
+			  duration[trackNo] = resp.duration;
+	  		  ele.innerText = resp.duration;
+
+			  ele = document.getElementById('enableRemote'+trackNo);	
+	  		  ele.checked = resp.enableRemote;
+
+			  ele = document.getElementById('enableLocal'+trackNo);	
+	  		  ele.checked = resp.enableLocal;
+			};
+
+			async function postSoundTrackConfig(trackNo) 
+			{
+			   var enableRemote = document.getElementById('enableRemote'+trackNo);
+			   var enableLocal = document.getElementById('enableLocal'+trackNo);
+			   var volume = document.getElementById('volume'+trackNo);
+			   var name = document.getElementById('name'+trackNo);
+			   var duration = document.getElementById('duration'+trackNo);
+
+  			   var url = "//"+window.location.host+"/api/soundtrack/config";
+
+              		   var out = '{"trackNo":' + trackNo + ',';
+			   out = out + '"name":"' + name[trackNo] + '",';
+					   out = out + '"volume":' + volume[trackNo] + ',';
+              		   out = out + '"duration":' + duration[trackNo] + ',';
+              		   out = out + '"enableRemote":' + enableRemote.checked + ',';
+              		   out = out + '"enableLocal":' + enableLocal.checked + ',';
+ 			   postit(url,out);
+			};
+
+			async function trimChanged()
+			{
+
+				console.log("manual trim changed");
+				console.log("bit "+bit);
+				console.log("value"+this.value);
+
+				var url = "//"+window.location.host+"/api/mp3Player/config";
+            	var out = '{"manualTrim":' +  document.getElementById('manualTrimInput').value + ',';
+				out = out + '"autoTrim":' + document.getElementById('autoTrimInput').value + ' }';
+				console.log(out);
+ 			    postit(url,out);
+			};
+
+			async function playTrack(track, loop)
+			{
+				console.log("play track "+track+" loop "+loop);
+				var url = "//"+window.location.host+"/api/soundtrack/play";
+				var out = '{"track":' +  track + ', "loop":' + loop + ' }';
+				console.log(out);
+ 			    postit(url,out);
+			};
+
+			async function stopTrack(track)
+			{
+				console.log("stop track "+track);
+				var url = "//"+window.location.host+"/api/soundtrack/stop";
+				var out = '{"track":' +  track + ' }';
+				console.log(out);
+ 			    postit(url,out);
+			};
+
+			async function launchSoundCongfig(track)
+			{
+  			  var url = "//"+window.location.host+"/page/soundconfig?trackno="+track;
+				open(url);
+			};
+
+			async function postit(url, content)
+  			{
+				console.log("postit " + url);
+  			   const response = await fetch(url, 
+			   {
+
+    			      method: "POST",
+    			         //body: JSON.stringify(content),
+    			         body: content,
+    			      headers: 
+    			      	 {"Content-type": "application/json; charset=UTF-8"}
+  			    });
+			}
+
+		</script>
+  	</head>
+  	<body onload = "init()">
+		
+  		<h1><p font-size: 30 px;text-align: "centre";color: #444444; id="header";></p>MP3 Player</h1>
+  		</br>
+  		    current volume</br>
+			<span id="currentVolume">-Loading</span>
+		</br></br>
+		    current track</br>
+			<span id="currentTrack">-Loading</span>
+		</br></br>
+		    Manual volume trim</br>
+			<input type="text" id="manualTrimInput" name="manualTrimInput" value="-Loading..."></br>
+		</br></br>
+		    Auto volume</br>
+			<input type="text" id="autoTrimInput" name="autoTrimInput" value="-Loading..."></br>
+		</br></br>
+			<button type="button" style="height:25px;width:80px;font-size:10px" 
+				onclick="postMP3PlayerConfig()">Save</button></br>
+		</br></br>
+
+			<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>
+			<tr>
+				<td width="17%">Track:00</td>
+				<td width="17%"><p  id="name0"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration0"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume0"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('0')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote0" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal0" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('0','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('0','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('0')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('0')">Refresh</button></th></td>
+			</tr>
+
+			<tr>
+				<td width="17%">Track:01</td>
+				<td width="17%"><p  id="name1"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration1"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume1"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('1')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote1" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal1" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('1','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('1','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('1')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('1')">Refresh</button></th></td>
+			</tr>
+
+			<tr>
+				<td width="17%">Track:02</td>
+				<td width="17%"><p  id="name2"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration2"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume2"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('2')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote2" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal2" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('2','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('2','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('2')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('2')">Refresh</button></th></td>
+			</tr>
+			<tr>
+				<td width="17%">Track:03</td>
+				<td width="17%"><p  id="name3"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration3"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume3"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('3')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote3" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal3" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('3','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('3','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('3')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('3')">Refresh</button></th></td>
+			</tr>
+
+			<tr>
+				<td width="17%">Track:04</td>
+				<td width="17%"><p  id="name4"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration4"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume4"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('4')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote4" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal4" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('4','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('4','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('4')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('4')">Refresh</button></th></td>
+			</tr>
+
+			<tr>
+				<td width="17%">Track:05</td>
+				<td width="17%"><p  id="name5"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration5"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume5"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('5')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote5" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal5" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('5','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('5','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('5')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('5')">Refresh</button></th></td>
+			</tr>
+
+			<tr>
+				<td width="17%">Track:06</td>
+				<td width="17%"><p  id="name6"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration6"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume6"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('6')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote6" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal6" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('6','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('6','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('6')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('6')">Refresh</button></th></td>
+			</tr>
+
+			<tr>
+				<td width="17%">Track:07</td>
+				<td width="17%"><p  id="name7"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration7"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume7"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('7')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote7" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal7" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('7','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('7','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('7')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('7')">Refresh</button></th></td>
+			</tr>
+
+			<tr>
+				<td width="17%">Track:08</td>
+				<td width="17%"><p  id="name8"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration8"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume8"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('8')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote8" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal8" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('8','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('8','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('8')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('8')">Refresh</button></th></td>
+			</tr>
+
+			<tr>
+				<td width="17%">Track:09</td>
+				<td width="17%"><p  id="name9"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration9"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume9"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('9')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote9" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal9" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('9','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('9','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('9')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('9')">Refresh</button></th></td>
+			</tr>
+
+			<tr>
+				<td width="17%">Track:0A</td>
+				<td width="17%"><p  id="name10"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration10"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume10"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('10')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote10" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal10" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('10','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('10','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('10')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('10')">Refresh</button></th></td>
+			</tr>
+
+			<tr>
+				<td width="17%">Track:0B</td>
+				<td width="17%"><p  id="name11"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration11"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume11"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('11')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote11" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal11" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('11','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('11','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('11')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('11')">Refresh</button></th></td>
+			</tr>
+
+			<tr>
+				<td width="17%">Track:0C</td>
+				<td width="17%"><p  id="name12"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration12"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume12"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('12')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote12" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal12" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('12','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('12','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('12')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('12')">Refresh</button></th></td>
+			</tr>
+
+			<tr>
+				<td width="17%">Track:0D</td>
+				<td width="17%"><p  id="name13"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration13"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume13"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('13')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote13" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal13" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('13','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('13','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('13')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('13')">Refresh</button></th></td>
+			</tr>
+
+			<tr>
+				<td width="17%">Track:0E</td>
+				<td width="17%"><p  id="name14"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration14"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume14"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('14')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote14" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal14" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('14','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('14','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('14')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('14')">Refresh</button></th></td>
+			</tr>
+
+			<tr>
+				<td width="17%">Track:0F</td>
+				<td width="17%"><p  id="name15"; value="-Loading"></p></td>
+				<td width="17%"><p  id="duration15"; value="-Loading"></p></td>
+				<td width="17%"><p  id="volume15"; value="-Loading"></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSoundCongfig('15')">Configure</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote15" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal15" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('15','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playTrack('15','1')">Play Loop</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopTrack('15')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getSoundTrackStatus('15')">Refresh</button></th></td>
+			</tr>
+
+		</table>
+	</br></br>
+	<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>
+		<tr>
+			<td style="width:25%"><a href='/page/node'>node</a></td>
+			<td style="width:25%"><a href='/page/gpio'>gpio</a></td>
+			<td style="width:25%"><a href='/page/action'>action</a></td>
+			<td style="width:25%"><a href='/page/sound'>sound</a></td>
+	</table>
+  	</body>
+  </html>
+  
+  
+  
+  
+  
+  

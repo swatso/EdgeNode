@@ -1,0 +1,610 @@
+  <!DOCTYPE html> 
+  <html>
+  	<head>
+	  	<meta name="viewport" content="width=device-width, initial-scale=1">
+  		<title>Action</title>
+  		<link rel="shortcut icon" href="/favicon">
+  		<style>
+			left-align {text-align: left;}
+  		    meta {content:"width=device-width, initial-scale=1"}
+  			html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: left;}
+  			body{margin-top: 50px;} h1 {color: #444444;margin: auto 30px;text-align: center;} h3 {color: #444444;margin-bottom: 20px;}
+  			p {font-size: 14px;color: #888;margin-bottom: 10px;}
+			table {border: 1px solid black;border-collapse: collapse;}
+			th, td {text-align: left;padding: 8px;}
+			tr:nth-child(odd) {background-color: #D6EEEE;}
+			td {border-bottom: 1px solid #444444;}
+  		</style>
+  		<script>
+
+			name = [];
+			volume = [];
+			duration = [];
+			
+			async function init()
+			{
+console.log("init");
+				for(var i=0;i<16;i++)
+				{
+					getActionConfig(i);
+				}
+				const checkbox = document.querySelectorAll('input[type="checkbox"]');
+				checkbox.forEach(cb => {cb.addEventListener('change', checkboxChanged);});
+
+console.log("end of init");
+			};
+
+			async function checkboxChanged()
+			{
+				console.log("changed");
+				var number = this.id.slice(-2);
+				if (typeof value === "number")number = number*10+this.id.slice(-1);
+				postActionConfig(number)
+			}
+
+			async function getActionConfig(number) 
+			{
+console.log("getActionConfig" + number);
+
+			  var response = await fetch("//"+window.location.host+"/api/action/config?number="+number);
+			  var data = await response.json();
+			  var resp = JSON.parse(JSON.stringify(data));
+console.log(resp);
+			  ele = document.getElementById('enableRemote'+number);	
+	  		  ele.checked = resp.enableRemote;
+			  ele = document.getElementById('enableLocal'+number);	
+	  		  ele.checked = resp.enableLocal;
+			};
+
+			async function postActionConfig(number) 
+			{
+			   var enableRemote = document.getElementById('enableRemote'+number);
+			   var enableLocal = document.getElementById('enableLocal'+number);
+  			   var url = "//"+window.location.host+"/api/action/config";
+               var out = '{"number":' + number + ',';
+               out = out + '"enableRemote":' + enableRemote.checked + ',';
+               out = out + '"enableLocal":' + enableLocal.checked + ' }';
+ 			   postit(url,out);
+			};
+
+			async function playAction(number, loop)
+			{
+				console.log("play action "+number+" loop "+loop);
+				var url = "//"+window.location.host+"/api/action/play";
+				var out = '{"number":' +  number + ', "loop":' + loop + ' }';
+				console.log(out);
+ 			    postit(url,out);
+			};
+
+			async function stopAction(number)
+			{
+				console.log("stop action "+number);
+				var url = "//"+window.location.host+"/api/action/stop";
+				var out = '{"number":' +  number + ' }';
+				console.log(out);
+ 			    postit(url,out);
+			};
+
+			async function launchActionConfig(number)
+			{
+  			  var url = "//"+window.location.host+"/page/actionconfig?number="+number;
+				open(url);
+			};
+
+			async function postit(url, content)
+  			{
+				console.log("postit " + url);
+  			   const response = await fetch(url, 
+			   {
+
+    			      method: "POST",
+    			         //body: JSON.stringify(content),
+    			         body: content,
+    			      headers: 
+    			      	 {"Content-type": "application/json; charset=UTF-8"}
+  			    });
+			}
+
+		</script>
+  	</head>
+  	<body onload = "init()">
+		
+  		<h1><p font-size: 30 px;text-align: "centre";color: #444444; id="header";></p>Actions</h1>
+
+		</br></br>
+
+			<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>
+			<tr>
+				<td width="17%">Action:00</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('0')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote0" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal0" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('0','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('0','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('0')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('0')">Refresh</button></th></td>
+			</tr>
+				<tr>
+				<td width="17%">Action:01</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('1')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote1" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal1" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('1','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('1','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('1')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('1')">Refresh</button></th></td>
+			</tr>
+			
+			</tr>
+				<tr>
+				<td width="17%">Action:02</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('2')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote2" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal2" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('2','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('2','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('2')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('2')">Refresh</button></th></td>
+			</tr>
+
+			</tr>
+				<tr>
+				<td width="17%">Action:03</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('3')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote3" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal3" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('3','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('3','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('3')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('3')">Refresh</button></th></td>
+			</tr>
+
+			</tr>
+				<tr>
+				<td width="17%">Action:04</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('4')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote4" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal4" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('4','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('4','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('4')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('4')">Refresh</button></th></td>
+			</tr>
+
+			</tr>
+				<tr>
+				<td width="17%">Action:05</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('5')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote5" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal5" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('5','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('5','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('5')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('5')">Refresh</button></th></td>
+			</tr>
+
+			</tr>
+				<tr>
+				<td width="17%">Action:06</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('6')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote6" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal6" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('6','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('6','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('6')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('6')">Refresh</button></th></td>
+			</tr>
+
+			</tr>
+				<tr>
+				<td width="17%">Action:07</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('7')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote7" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal7" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('7','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('7','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('7')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('7')">Refresh</button></th></td>
+			</tr>
+
+			</tr>
+				<tr>
+				<td width="17%">Action:08</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('8')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote8" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal8" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('8','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('8','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('8')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('8')">Refresh</button></th></td>
+			</tr>
+
+			</tr>
+				<tr>
+				<td width="17%">Action:09</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('9')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote9" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal9" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('9','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('9','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('9')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('9')">Refresh</button></th></td>
+			</tr>
+
+			</tr>
+				<tr>
+				<td width="17%">Action:0A</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('10')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote10" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal10" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('10','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('10','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('10')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('10')">Refresh</button></th></td>
+			</tr>
+
+			</tr>
+				<tr>
+				<td width="17%">Action:0B</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('11')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote11" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal11" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('11','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('11','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('11')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('11')">Refresh</button></th></td>
+			</tr>
+
+						</tr>
+				<tr>
+				<td width="17%">Action:0C</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('12')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote12" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal12" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('12','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('12','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('12')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('12')">Refresh</button></th></td>
+			</tr>
+
+			</tr>
+				<tr>
+				<td width="17%">Action:0D</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('13')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote13" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal13" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('13','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('13','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('13')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('13')">Refresh</button></th></td>
+			</tr>
+
+			</tr>
+				<tr>
+				<td width="17%">Action:0E</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('14')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote14" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal14" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('14','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('14','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('14')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('14')">Refresh</button></th></td>
+			</tr>
+
+			</tr>
+				<tr>
+				<td width="17%">Action:0F</td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="17%"><p  ></p></td>
+				<td width="15%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchActionConfig('15')">Live View</button></th>
+			</tr>
+			<tr>
+				<td width="17%">
+					<input type="checkbox" id="enableRemote15" value="Option1">Enable Remote</td>
+				<td width="17%">
+					<input type="checkbox" id="enableLocal15" value="Option1">Enable Local</td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('15','0')">Play Once</button></td>
+   		    	<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="playAction('15','1')">Play Loop</button></td>
+				<td width="17%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="stopAction('15')">Stop</button></td>
+				<td width="15%"> 
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="getActionConfig('15')">Refresh</button></th></td>
+			</tr>
+
+		</table>
+	</br></br>
+	<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>
+		<tr>
+			<td style="width:25%"><a href='/page/node'>node</a></td>
+			<td style="width:25%"><a href='/page/gpio'>gpio</a></td>
+			<td style="width:25%"><a href='/page/action'>action</a></td>
+			<td style="width:25%"><a href='/page/sound'>sound</a></td>
+	</table>
+  	</body>
+  </html>
+  
+  
+  
+  
+  
+  

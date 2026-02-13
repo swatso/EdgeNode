@@ -1,0 +1,130 @@
+  <!DOCTYPE html> 
+  <html>
+  	<head>
+	  	<meta name="viewport" content="width=device-width, initial-scale=1">
+  		<title>SoundTrack Configuration</title>
+  		<link rel="shortcut icon" href="/favicon">
+  		<style>
+			left-align {text-align: left;}
+  		    meta {content:"width=device-width, initial-scale=1"}
+  			html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: left;}
+  			body{margin-top: 50px;} h1 {color: #444444;margin: auto 30px;text-align: center;} h3 {color: #444444;margin-bottom: 20px;}
+  			p {font-size: 14px;color: black;margin-bottom: 10px;}
+			table {border: 1px solid black;border-collapse: collapse;}
+			th, td {text-align: left;padding: 8px;}
+			tr:nth-child(odd) {background-color: #D6EEEE;}
+			td {border-bottom: 1px solid #444444;}
+			.radio-group {display: grid; grid-template-columns: auto 1fr; gap: 10px;align-items: left;}
+  		</style>
+
+  		<script>
+			var track;
+
+			async function init()
+			{
+console.log("init");
+				myUrl = new URL(window.location.toLocaleString()).searchParams;
+				track = myUrl.get('trackno');
+
+				console.log(track);
+
+				getConfig(track);
+				document.getElementById("header").innerText = "Configuration for SoundTrack No: " +track;
+
+				const gpioTypes = document.querySelectorAll('input[name="type"]');
+				gpioTypes.forEach(type => {
+				type.addEventListener('change', typeChanged);});
+			}
+
+			async function postit(url, content)
+  			{
+  			   const response = await fetch(url, 
+			   {
+    			      method: "POST",
+    			         //body: JSON.stringify(content),
+    			         body: content,
+    			      headers: 
+    			      	 {"Content-type": "application/json; charset=UTF-8"}
+  			    });
+			}
+	  		
+			async function postSoundTrackConfig() 
+			{
+			   var enableRemote = document.getElementById('enableRemote');
+			   var enableLocal = document.getElementById('enableLocal');
+			   var volume = document.getElementById('Volume');
+			   var name = document.getElementById('Name');
+			   var duration = document.getElementById('Duration');
+
+  			   var url = "//"+window.location.host+"/api/soundtrack/config";
+
+              		   var out = '{"trackNo":' + track + ',';
+			   		   out = out + '"name":"' + name.value + '",';
+					   out = out + '"volume":' + volume.value + ',';
+              		   out = out + '"duration":' + duration.value + ',';
+              		   out = out + '"enableRemote":' + enableRemote.checked + ',';
+              		   out = out + '"enableLocal":' + enableLocal.checked + '}';
+console.log(out);
+ 			   postit(url,out);
+			};
+
+			async function getConfig(trackNo) 
+			{
+console.log("getConfig");
+  			  var response = await fetch("//"+window.location.host+"/api/soundTrack/status?track="+trackNo);
+			  var data = await response.json();
+			  var resp = JSON.parse(JSON.stringify(data));
+			  ele = document.getElementById('Name');	
+	  		  ele.value = resp.name;
+
+			  ele = document.getElementById('Volume');	
+	  		  ele.value = resp.volume;
+			  ele = document.getElementById('Duration');	
+	  		  ele.value = resp.duration;
+			  ele = document.getElementById('enableRemote');
+	  		  ele.checked = resp.enableRemote;
+			  ele = document.getElementById('enableLocal');	
+	  		  ele.checked = resp.enableLocal;
+console.log("done");
+			};
+
+		</script>
+  	</head>
+	<body onload = "init()">
+		<h1><p font-size: 30 px;text-align: "centre";color: #444444; id="header";></p>SoundTrack Configuration</h1>
+  		</br>
+  		    Name</br>
+			<input type="text" id="Name" name="Name" value="- Loading..."></br></br>
+
+  		    Duration (S)</br>
+			<input type="text" id="Duration" name="Duration" value="- Loading..."></br></br>
+  		    Volume</br>
+			<input type="text" id="Volume" name="Volume" value="- Loading..."></br></br>
+  		    Enable Remote Control</br>
+    			<input type="checkbox" id="enableRemote" value="Option1"></br></br>
+  		    Enable Local Control</br>
+    			<input type="checkbox" id="enableLocal" value="Option1"></br></br>					
+ 	        <button type="button" style="height:60px;width:200px;font-size:20px" onclick="postSoundTrackConfig(track)">Save</button><br><br>
+
+			</br></br>
+			<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>
+			<tr>
+				<td style="width:25%"><a href='/page/node'>node</a></td>
+				<td style="width:25%"><a href='/page/gpio'>gpio</a></td>
+				<td style="width:25%"><a href='/page/scene'>scene</a></td>
+				<td style="width:25%"><a href='/page/sound'>sound</a></td>
+			</tr>
+				<td style="width:25%"><a href='/page/nodeConfig'>config</a></td>
+				<td style="width:25%"><a href='/page/gpioConfig'>config</a></td>
+				<td style="width:25%"><a href='/page/sceneConfig'>config</a></td>
+				<td style="width:25%"><a href='/page/soundConfig'>config</a></td>
+			</tr>
+		</table>
+  	</body>
+  </html>
+  
+  
+  
+  
+  
+  
