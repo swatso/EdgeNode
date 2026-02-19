@@ -14,6 +14,7 @@ const char* loudOffsetPath = "/loudOffset.txt";
 const char* nodeConfigPath = "/config#.txt";
 const char* trackConfigPath = "/trackConfig#.txt";
 const char* actionConfigPath = "/actionConfig#.txt";
+const char* servoConfigPath = "/servoConfig#.txt";
 
 // Initialize SPIFFS
 void setupSPIFFS() 
@@ -265,6 +266,75 @@ void readMP3TrackConfigFile(fs::FS &fs, uint8_t trackNo)
   Serial.println(mp3.track[trackNo].enableRemote);
 
   file.close();
+}
+
+void writeServoPosition(fs::FS &fs, uint8_t bitNo, int position)
+{
+  Serial.print("Writing Servo config file:");
+  Serial.println(bitNo);
+
+  vTaskDelay(100);
+  char path[30];
+  uint8_t i,j;
+  for(i=0, j=0; servoConfigPath[i] != 0; i++)
+  {
+    if(servoConfigPath[i] != HASH)path[j++] = servoConfigPath[i];
+    else
+    {
+      char buffer[3];
+      sprintf(buffer, "%02d", bitNo);
+      path[j++]=buffer[0];
+      path[j++]=buffer[1];
+    }
+  }
+  path[j]=0;
+  File file = fs.open(path, FILE_WRITE);
+  if(!file)
+  {
+    Serial.println("- failed to open servo config file for writing");
+    return;
+  }
+  file.println(position);
+  file.close();
+}
+
+int readServoPosition(fs::FS &fs, uint8_t bitNo)
+{
+  Serial.print("Reading servo config file: ");
+  Serial.println(bitNo);
+  vTaskDelay(10);
+  char path[30];
+  uint8_t i,j;
+  for(i=0, j=0; servoConfigPath[i] != 0; i++)
+  {
+    if(servoConfigPath[i] != HASH)path[j++] = servoConfigPath[i];
+    else
+    {
+      char buffer[3];
+      sprintf(buffer, "%02d", bitNo);
+      path[j++]=buffer[0];
+      path[j++]=buffer[1];
+    }
+  }
+  path[j]=0;
+  File file = fs.open(path, FILE_READ);
+  if(!file)
+  {
+    Serial.println("- failed to open servo config file for reading");
+    return(-1);
+  }
+  if(file.size() == 0)
+  {
+    // config file is empty, so just leave the hardcoded defaults
+    file.close();
+    Serial.println("No File");
+    return(-1);
+  }
+  int position = std::stoi(readConfigItem(file),NULL,10);
+Serial.print("position: ");
+Serial.println(position);
+  file.close();
+  return position;
 }
 
 void writeActionConfigFile(fs::FS &fs, uint8_t number)

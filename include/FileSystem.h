@@ -12,6 +12,8 @@ void readMP3TrackConfigFile(fs::FS &fs, uint8_t trackNo);
 void writeActionConfigFile(fs::FS &fs, uint8_t number);
 void readActionConfigFile(fs::FS &fs, uint8_t number);
 char* readConfigItem(File file);
+int readServoPosition(fs::FS &fs, uint8_t bitNo);
+void writeServoPosition(fs::FS &fs, uint8_t bitNo, int position);
 
 /*/
 char* readFileC(fs::FS &fs, const char *path, const char *deft);

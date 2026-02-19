@@ -24,6 +24,10 @@
 //  * local / remote enable
 //
 
+// Create Queue handles
+QueueHandle_t servoQueue;
+
+// Task handles for GPIO helper tasks
 TaskHandle_t gpioTask0;
 TaskHandle_t gpioTask1;
 TaskHandle_t gpioTask2;
@@ -40,7 +44,7 @@ TaskHandle_t gpioTask12;
 TaskHandle_t gpioTask13;
 TaskHandle_t gpioTask14;
 TaskHandle_t gpioTask15;
-
+TaskHandle_t servoSaverTask;
 gpioPin gpio[16];                // Create an array of GPIO Classes which can be indexed [0] to [15] to control GPIO
 
 
@@ -96,6 +100,11 @@ void  setupGPIO()
   gpio[16].bitNo = 15;
   analogReadResolution(12);       // set the resolution to 12 bits (0-4096)
 
+    // Create servo queue
+  servoQueue = xQueueCreate(50, sizeof(servoData));
+  if (servoQueue == NULL) Serial.println("Error creating the servo queue");
+  else xTaskCreatePinnedToCore(servoSaver, "ServoSaver", 2000, NULL, 1, &servoSaverTask, 0); // Core 0
+
   // Create helper tasks for each GPIO pin
   xTaskCreatePinnedToCore(helper0, "GPIO0", 2000, NULL, 1, &gpioTask0, 0); // Core 0
   xTaskCreatePinnedToCore(helper1, "GPIO1", 2000, NULL, 1, &gpioTask1, 0); // Core 0
@@ -113,16 +122,30 @@ void  setupGPIO()
   xTaskCreatePinnedToCore(helper13, "GPIOD", 2000, NULL, 1, &gpioTask13, 0); // Core 0
   xTaskCreatePinnedToCore(helper14, "GPIOE", 2000, NULL, 1, &gpioTask14, 0); // Core 0
   xTaskCreatePinnedToCore(helper15, "GPIOF", 2000, NULL, 1, &gpioTask15, 0); // Core 0
-  
+
   Serial.println("done setupGPIO");
 }
 
-void  powerGPIO()
+void  powerGPIO(bool powerUp)
 {
   // Powers up electrical feed to thw switch 0V line (powers servos etc)
   Serial.println("powerup GPIO ");
 pinMode(POWER_GPIO,OUTPUT);
-digitalWrite(POWER_GPIO, HIGH);
+digitalWrite(POWER_GPIO, powerUp);
+}
+
+void loadServoPositions()
+{
+  // Load the last saved servo positions from the SPIFFS file system
+  for(int bit=0; bit<16; bit++)
+  {
+    int position = readServoPosition(SPIFFS, bit);
+    if(position >= 0)
+    {
+      Serial.printf("Loaded position for servo %d: %d\n", bit, position);
+      gpio[bit].localWrite(position);
+    }
+  }
 }
 
 void helper0(void * pvParameters)
@@ -330,7 +353,12 @@ void gpioPin::write(int demand)
     }
     else if((type == GPIO_PWM) || (type == GPIO_PWM_PULSE))
     {
-      analogWrite(pin,demand);
+      if(value == 0)analogWrite(pin,preset1);
+      else analogWrite(pin,preset2);
+      Serial.print("preset1:");
+      Serial.println(preset1);
+      Serial.print("preset2:");
+      Serial.println(preset2);
       value = demand;
       publish(bitNo,value);
     }
@@ -469,7 +497,8 @@ void gpioPin::servoController()
       value = read();
       vTaskDelay(100 / portTICK_PERIOD_MS);
     }
-    publish(bitNo,value);
+    queServoPosition(bitNo, value, SERVO_SETTLING_DELAY);         // queue the current servo position for saving to SPIFFS after a delay to allow the servo to settle
+    publish(bitNo,value);                                         //  publish (MQTT) the final position after the easeTo has completed
     while(value == target)
     {
       if(publishRate != 0)
@@ -567,6 +596,43 @@ void gpioPin::outputPulser()
     {
       nextPublish = millis()+publishRate;
       publish(bitNo,value);
+    }
+  }
+}
+
+void queServoPosition(uint8_t bitNo, int position, unsigned int delay)
+{
+  // This function is called by the gpioPin helper task when a servo position is updated
+  // It queues the new position for the servo saver task to save to SPIFFS
+  servoData data;
+  data.bitNo = bitNo;
+  data.position = position;
+  data.timestamp = millis() + delay;   // add a delay to allow the servo to settle before saving the position
+  if(xQueueSend(servoQueue, &data, 0) != pdPASS)
+  {
+    Serial.println("Error queuing servo position");
+  }
+}
+
+void servoSaver(void * pvParameters)
+{
+  // This helper task periodically saves the current servo position to the SPIFFS file system
+  // This allows the position to be restored at powerup and also allows the web interface to display the current position
+  servoData receivedServo;
+  while(true)
+  {
+    // Wait indefinitely for servo data
+    if (xQueueReceive(servoQueue, &receivedServo, portMAX_DELAY) == pdPASS) 
+    {
+      Serial.printf("[Servo] Received position for servo: %d, position: %d\n", receivedServo.bitNo, receivedServo.position);
+      if(millis() > receivedServo.timestamp)
+      {
+        // Save the position to SPIFFS
+        writeServoPosition(SPIFFS, receivedServo.bitNo, receivedServo.position);
+        Serial.printf("[Servo] Saved position for servo: %d\n", receivedServo.bitNo);
+      }
+      // Save the servo position to SPIFFS or perform other actions
+      vTaskDelay(100 / portTICK_PERIOD_MS);
     }
   }
 }

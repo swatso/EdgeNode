@@ -400,6 +400,7 @@ Serial.println(gpio[bit].enableRemote);
       if (request->url() == "/api/node/restart") 
       {
         Serial.println("Restart Requested");
+        powerGPIO(false);
         delay(1000);
         ESP.restart();
       }
@@ -454,6 +455,7 @@ Serial.println(gpio[bit].enableRemote);
           }
           else
           {
+            Serial.println("config/bit");
             uint8_t bit = (int) doc["bitNo"];
             const char* buff;
             buff = doc["name"].as<const char*>();

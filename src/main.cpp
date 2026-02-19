@@ -1,5 +1,3 @@
-
-
 //#include <Ticker.h>                               		//-- moved to arduinoGlue.h
 #include "gpioServoEasingTest.h"
 //#include <Arduino.h>
@@ -10,11 +8,9 @@
 #include "sound.h"
 #include "action.h"
 #include "arduinoGlue.h"
+#include "system.h"
 
 String Version = "GPIO Test 05/Feb/26";
-
-
-
 
 //#define debugTest
 
@@ -27,6 +23,7 @@ void setup()
   node.loadConfig();
   mp3.loadConfig();
   loadActionConfig();
+  loadServoPositions();
   setupApplication();
   setupGPIO();
   setupWiFi();
@@ -34,9 +31,8 @@ void setup()
   setupMQTTComms();
   setupSound();
   setupAction();
-  powerGPIO();
+  powerGPIO(true);
 
- 
 Serial.print("Core:");
 Serial.println(xPortGetCoreID());
 
@@ -110,6 +106,7 @@ void loop()
 //gpio[0].write(true);
 //pause(15000);
 //gpio[0].write(false);
+getSystemInfo();
 pause(15000);
 }
 

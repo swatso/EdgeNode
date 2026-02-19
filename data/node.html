@@ -70,6 +70,11 @@ console.log(resp.WIFIuptime);
 
 			};
 
+			async function launchNode()
+			{
+  			  var url = "//"+window.location.host+"/page/nodeconfig";
+			  open(url);
+			};
 
 
 		</script>
@@ -99,6 +104,8 @@ console.log(resp.WIFIuptime);
 			MQTT Uptime (Min)</br>
 		    <span id="MQTTUptime">-Loading...</span>
 		</br></br>
+			<button type="button" style="height:25px;width:80px;font-size:10px" 
+			onclick="launchNode()">Configure</button></th>
 
 	</br></br>
 	<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>

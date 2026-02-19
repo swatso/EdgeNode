@@ -9,8 +9,12 @@
 //const char* enableLocalPath = "/enableLocal#.txt";
 //const char* enableRemotePath = "/enableRemote#.txt";
 
-void setupGPIO();                                           
-void powerGPIO();  
+void setupGPIO();
+void servoSaver();
+void loadServoPositions();                                           
+void powerGPIO(bool powerUp);  
+
+#define SERVO_SETTLING_DELAY 5000   // delay (mS) after writing a new position to allow the servo to settle before saving the position to SPIFFS
 
 // define GPIO PIN mappings
 // These correspond to the PCB design assignments
@@ -40,6 +44,16 @@ void powerGPIO();
 #define GPIO_AIN 5
 #define GPIO_DIGOUT_PULSE 6
 #define GPIO_PWM_PULSE 7
+
+void queServoPosition(uint8_t bitNo, int position, unsigned int delay);
+
+// Encapsulates the data for saving the position single servo
+struct servoData
+{
+  uint8_t bitNo;                       // PCB bit number
+  int position;                       // current position of the servo
+  unsigned long timestamp;            // time of the last update + a delay to settle
+};
 
 // GPIO Controller Object
 // Encapsulates the data and methods for GPIO Control
@@ -88,6 +102,28 @@ private:
     SemaphoreHandle_t lock;
 };
 
+// Queue handles
+extern QueueHandle_t servoQueue;
+
+// Task handles for GPIO helper tasks - exposed so system monitoring can check stack free space
+extern TaskHandle_t gpioTask0;
+extern TaskHandle_t gpioTask1;
+extern TaskHandle_t gpioTask2;
+extern TaskHandle_t gpioTask3;
+extern TaskHandle_t gpioTask4;
+extern TaskHandle_t gpioTask5;
+extern TaskHandle_t gpioTask6;
+extern TaskHandle_t gpioTask7;
+extern TaskHandle_t gpioTask8;
+extern TaskHandle_t gpioTask9;
+extern TaskHandle_t gpioTask10;
+extern TaskHandle_t gpioTask11;
+extern TaskHandle_t gpioTask12;
+extern TaskHandle_t gpioTask13;
+extern TaskHandle_t gpioTask14;
+extern TaskHandle_t gpioTask15;
+
+// Correspondingnhelper functions
 void helper0(void * pvParameters);                          
 void helper1(void * pvParameters);                          
 void helper2(void * pvParameters);                          
@@ -104,6 +140,7 @@ void helper12(void * pvParameters);
 void helper13(void * pvParameters);                         
 void helper14(void * pvParameters);                         
 void helper15(void * pvParameters); 
+void servoSaver(void * pvParameters);
 
 extern gpioPin         gpio[]; 
 
