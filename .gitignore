@@ -8,5 +8,5 @@
 *.map
 *.o
 *.d
-*.pioenvs
-*.cache
+*.tmp
+*.log
