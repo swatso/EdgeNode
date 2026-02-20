@@ -236,8 +236,13 @@ void sensorReceiverTask(void *pvParameters)
     if (xQueueReceive(MQTTSensorQueue, &receivedSensor, portMAX_DELAY) == pdPASS) 
     {
       Serial.printf("[Sensor] Received value: %d\n", receivedSensor.value);
-      if(receivedSensor.value > 0)publishMQTT(sensorTopic, payloadTrue);
-      else publishMQTT(sensorTopic, payloadFalse);  
+      sensorTopic[17]=receivedSensor.bitNo + 0x30;
+      if(sensorTopic[17] > 57)sensorTopic[17]+=7;
+//      if(receivedSensor.value > 0)publishMQTT(sensorTopic, payloadTrue);
+//      else publishMQTT(sensorTopic, payloadFalse);  
+        char payload[10];
+        sprintf(payload, "%d", receivedSensor.value);
+        publishMQTT(sensorTopic, payload);
       vTaskDelay(100 / portTICK_PERIOD_MS);
     }
   }

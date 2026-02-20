@@ -24,9 +24,9 @@
 			{
 				myUrl = new URL(window.location.toLocaleString()).searchParams;
 				bit = myUrl.get('bitno');
-				getConfig(bit);
+				await getConfig(bit);
 				document.getElementById("header").innerText = "Configuration for GPIO BitNo: " +bit;
-				showHelp(bit);
+				showHelp(document.querySelector('input[name="type"]:checked').value);
 				const gpioTypes = document.querySelectorAll('input[name="type"]');
 				gpioTypes.forEach(type => {
 				type.addEventListener('change', typeChanged);});
@@ -35,7 +35,7 @@
 			async function typeChanged()
 			{
       			const type = document.querySelector('input[name="type"]:checked');
-				showHelp(type);
+				showHelp(type.value);
 			}
 
 			async function postit(url, content)
@@ -52,16 +52,13 @@
 	  		
 			async function postConfig(bit) 
 			{
-console.log("aa");
       			   const selectedType = document.querySelector('input[name="type"]:checked');
 			   var name = document.getElementById('Name');
               		   var preset0 = document.getElementById('Preset0');
               		   var preset1 = document.getElementById('Preset1');
               		   var preset2 = document.getElementById('Preset2');
               		   var rate = document.getElementById('Rate');
-console.log("x");
 			   var easingType = document.getElementById('easingType');
-console.log("y");
 			   var enableRemote = document.getElementById('enableRemote');
 			   var enableLocal = document.getElementById('enableLocal');
               		   var publishRate = document.getElementById('PublishRate');
@@ -74,26 +71,21 @@ console.log("y");
               		   out = out + '"preset1":' + preset1.value + ',';
               		   out = out + '"preset2":' + preset2.value + ',';
               		   out = out + '"rate":' + rate.value + ',';
-console.log("a");
               		   out = out + '"easingType":' + easingType.value + ',';
-console.log("b");
               		   out = out + '"enableRemote":' + enableRemote.checked + ',';
               		   out = out + '"enableLocal":' + enableLocal.checked + ',';
               		   out = out + '"publishRate":' + publishRate.value + '}';
-console.log(out);
  			   postit(url,out);
 			};
 
 			async function getConfig(bit) 
 			{
-console.log("getConfig");
-  			  var response = await fetch("//"+window.location.host+"/api/gpio/config/bit?bitno="+bit);
+ 			  var response = await fetch("//"+window.location.host+"/api/gpio/config/bit?bitno="+bit);
 			  var data = await response.json();
 			  var resp = JSON.parse(JSON.stringify(data));
 			  ele = document.getElementById('Name');	
 	  		  ele.value = resp.name;
 			  var bitNo = resp.bitNo;
-console.log("get type:" + resp.type);
 			  var id = "type" + resp.type
               		  var ele = document.getElementById(id);	
 	  		  ele.checked = true;
@@ -108,35 +100,32 @@ console.log("get type:" + resp.type);
 			  ele = document.getElementById('easingType');
 			  ele.value = resp.easingType;
 			  ele = document.getElementById('enableRemote');
-			  
-			  console.log(resp.enableRemote);
-
 	  		  ele.checked = resp.enableRemote;
 			  ele = document.getElementById('enableLocal');	
 	  		  ele.checked = resp.enableLocal;
 			  ele = document.getElementById('PublishRate');	
 	  		  ele.value = resp.publishRate;
-console.log("done");
 			};
 
 			function showHelp(type) 
 			{
 				for(var i=0;i<8;i++)
 				{
-					var ele1 = document.getElementById("type" + i + "1").style.display = 'none';
-					var ele2 = document.getElementById("type" + i + "2").style.display = 'none';
-					var ele3 = document.getElementById("type" + i + "3").style.display = 'none';
-					var ele4 = document.getElementById("type" + i + "4").style.display = 'none';
-					var ele5 = document.getElementById("type" + i + "5").style.display = 'none';
+					var ele1 = document.getElementById("type" + i + "1").style.display = 'none';  	// Preset 0 help
+					var ele2 = document.getElementById("type" + i + "2").style.display = 'none';	// Preset 1 help
+					var ele3 = document.getElementById("type" + i + "3").style.display = 'none';	// Preset 2 help
+					var ele4 = document.getElementById("type" + i + "4").style.display = 'none';	// Rate help
+					var ele5 = document.getElementById("type" + i + "5").style.display = 'none';	// Easing Type help
+					var ele8 = document.getElementById("type" + i + "8").style.display = 'none';	// Publish Rate help
 				}
-				var ele6 = document.getElementById("ServoEasing").style.display = 'none';
-				if(type.value == 0)ele0.style.visibility = 'visible';
-				if(type.value == 1)ele1.style.display = 'block';
-				if(type.value == 2)ele2.style.display = 'block';
-				if(type.value == 3)ele3.style.display = 'block';
-				if(type.value == 4)ele4.style.display = 'block';
-				if(type.value == 5)ele5.style.display = 'block';
-				if(type.value == 3)ele6.style.display = 'block';
+console.log("type:" + type);
+
+				document.getElementById("type" + type + "1").style.display = 'block';			
+				document.getElementById("type" + type + "2").style.display = 'block';			 
+				document.getElementById("type" + type + "3").style.display = 'block';			
+				document.getElementById("type" + type + "4").style.display = 'block';					
+				document.getElementById("type" + type + "5").style.display = 'block';	
+				document.getElementById("type" + type + "8").style.display = 'block';		
 			};
 
 		</script>
@@ -263,7 +252,7 @@ console.log("done");
 					<span id="type05" style="display:none">Not Used</span>
 					<span id="type15" style="display:none">Not Used</span>
 					<span id="type25" style="display:none">Not Used</span>
-					<span id="type35" style="display:none">Not Used</span>
+					<span id="type35" style="display:none">Select easing type</span>
 					<span id="type45" style="display:none">Not Used</span>
 					<span id="type55" style="display:none">Not Used</span>
 					<span id="type65" style="display:none">Not Used</span>
@@ -292,13 +281,13 @@ console.log("done");
 				<td width=30%"><input type="text" id="PublishRate" name="PublishRate" value="- Loading..."></td>
 				<td width=40%">
 					<span id="type08">Not Used</span>
-					<span id="type18">Background Publish Rate (mS)</span>
-					<span id="type28">Background Publish Rate (mS)</span>
-					<span id="type38">Background Publish Rate (mS)</span>
-					<span id="type48">Background Publish Rate (mS)</span>
-					<span id="type58">Background Publish Rate (mS)</span>
-					<span id="type68">Background Publish Rate (mS)</span>
-					<span id="type78">Background Publish Rate (mS)</span>
+					<span id="type18">Background MQTT Publish Rate (mS) -even if value does not change</span>
+					<span id="type28">Background MQTT Publish Rate (mS) -even if value does not change</span>
+					<span id="type38">Background MQTT Publish Rate (mS) -even if value does not change</span>
+					<span id="type48">Background MQTT Publish Rate (mS) -even if value does not change</span>
+					<span id="type58">Background MQTT Publish Rate (mS) -even if value does not change</span>
+					<span id="type68">Background MQTT Publish Rate (mS) -even if value does not change</span>
+					<span id="type78">Background MQTT Publish Rate (mS) -even if value does not change</span>
 				</td>
 			</tr>
 			</table>

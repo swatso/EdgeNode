@@ -353,13 +353,13 @@ void gpioPin::write(int demand)
     }
     else if((type == GPIO_PWM) || (type == GPIO_PWM_PULSE))
     {
+      value = demand;
       if(value == 0)analogWrite(pin,preset1);
       else analogWrite(pin,preset2);
       Serial.print("preset1:");
       Serial.println(preset1);
       Serial.print("preset2:");
       Serial.println(preset2);
-      value = demand;
       publish(bitNo,value);
     }
     else if(type == GPIO_SERVO)
