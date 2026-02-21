@@ -15,7 +15,7 @@ boolean publishBit(byte bitNo);
 boolean publishMQTT(char* topic, char* message);
 void serviceConnection();
 void sensorReceiverTask(void *pvParameters);
-void debugReceiverTask(void *pvParameters);
+void messageReceiverTask(void *pvParameters);
 void MQTTcallback(char* topic, byte* payload, unsigned int length);
 boolean checkMQTTState();
 unsigned long getMQTTUptime();

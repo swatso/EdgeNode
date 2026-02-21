@@ -26,6 +26,7 @@
 #include <Ticker.h>
 #include "sound.h"
 #include "FileSystem.h"
+#include "debugStream.h"
 
 SoftwareSerial channel1(34, 33);    // RX, TX
 
@@ -81,8 +82,7 @@ Serial.print("(play) fileNo:");
 Serial.println(fileNo);
     currentTrack = fileNo;
     repeat = Trepeat;
-    _getVolume();
-    execute_CMD(0x06,0,currentVolume);            // Set volume
+    _getVolume();               // Set the volume based on the current track and volume settings before starting playback
     pause(500);
     execute_CMD(0x0F,01,fileNo);                  // Play track (from folder 01)
     channel1Ticker.attach_ms(track[fileNo].duration, _finished); 
@@ -96,6 +96,14 @@ Serial.println(fileNo);
   Serial.println(" seconds");
   Serial.print(" repeat:");
   Serial.println(repeat);
+  localDebug.print("volume:");
+  localDebug.println(currentVolume);
+  globalDebug.print("volume:");
+  globalDebug.println(currentVolume);
+  localOperations.print("volume:");
+  localOperations.println(currentVolume);
+  globalOperations.print("volume:");
+  globalOperations.println(currentVolume);
   }
 }
 
@@ -138,15 +146,11 @@ void mp3Player::execute_CMD(byte CMD, byte Par1, byte Par2)
   // Build the command line
   byte Command_line[10] = { Start_Byte, Version_Byte, Command_Length, CMD, Acknowledge,
   Par1, Par2, highByte(checksum), lowByte(checksum), End_Byte};
-
-  Serial.println("execute_CMD");
-
   //Send the command line to the module
   for (byte k=0; k<10; k++)
   {
     channel1.write( Command_line[k]);
   }
-  Serial.println();
 }
 
 void _getVolume()
@@ -168,6 +172,7 @@ void _getVolume()
   analogValue = analogValue / 4096;
   newVol = mp3.track[mp3.currentTrack].volume + analogValue + mp3.manualTrim;
   if(mp3.autoTrimEnabled == true)newVol += mp3.autoTrim;
+  mp3.setVolume(newVol);
   return;
 }
 
@@ -187,8 +192,8 @@ void mp3Player::setVolume(int level)
     currentVolume = level;
     // write the volume to the MP3 player
     execute_CMD(0x06,0,level);                         // Adjust volume
-    Serial.print("(_setVolume) Volume:"); 
-    Serial.println(currentVolume);
+//    Serial.print("(_setVolume) Volume:"); 
+//    Serial.println(currentVolume);
   }
 }
 

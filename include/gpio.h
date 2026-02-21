@@ -97,6 +97,7 @@ private:
     int read();
     void servoController();
     void inputPoller();
+    void outputHelper();
     void outputPulser();
     void publish(uint8_t bit, int aValue);
     SemaphoreHandle_t lock;

@@ -517,20 +517,20 @@ void readConfigFile(fs::FS &fs, uint8_t bit)
     Serial.println("No File");
     return;
   }
-  Serial.println("a");
   char buffer[20];
   int l = file.readBytesUntil('\n',buffer,sizeof(buffer));
   buffer[l-1]='\0';
   for(i=0; (buffer[i] != '\0')&& (i<19); i++)gpio[bit].name[i] = buffer[i];
   gpio[bit].name[i]='\0';
 
-//int xx = std::stoi(readConfigItem(file),NULL,10);
-char* xx=readConfigItem(file);
-Serial.print("ReadConfigFile Type=");
-Serial.println(xx);
+  char* xx=readConfigItem(file);
+  Serial.print("ReadConfigFile bit=");
+  Serial.print(bit);
+  Serial.print(" Type=");
+  Serial.println(xx);
 
-gpio[bit].setType((std::stoi(xx,NULL,10)));
-Serial.println(std::stoi(xx,NULL,10));
+  gpio[bit].setType((std::stoi(xx,NULL,10)));
+
 
 //  gpio[bit].setType((int)(readConfigItem(file)));
 

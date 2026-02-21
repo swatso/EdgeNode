@@ -59,11 +59,7 @@ void  setupGPIO()
   Serial.println("setupGPIO");
   #endif
 
-  // Read the last saved gpio configuration
-  for(int bit=0; bit<16; bit++)
-  {
-    readConfigFile(SPIFFS,bit);
-  }
+
 
   // Map the I/O pins to match the physical PCB layout
   gpio[0].pin = GPIO_BIT00;
@@ -89,15 +85,22 @@ void  setupGPIO()
   gpio[10].pin = GPIO_BIT0A;
   gpio[10].bitNo = 10;
   gpio[11].pin = GPIO_BIT0B;
-  gpio[12].bitNo = 11;
+  gpio[11].bitNo = 11;
   gpio[12].pin = GPIO_BIT0C;
-  gpio[13].bitNo = 12;
+  gpio[12].bitNo = 12;
   gpio[13].pin = GPIO_BIT0D;
-  gpio[14].bitNo = 13;
+  gpio[13].bitNo = 13;
   gpio[14].pin = GPIO_BIT0E;
-  gpio[15].bitNo = 14;
+  gpio[14].bitNo = 14;
   gpio[15].pin = GPIO_BIT0F;
-  gpio[16].bitNo = 15;
+  gpio[15].bitNo = 15;
+
+  // Read the last saved gpio configuration
+  for(int bit=0; bit<16; bit++)
+  {
+    readConfigFile(SPIFFS,bit);
+  }
+
   analogReadResolution(12);       // set the resolution to 12 bits (0-4096)
 
     // Create servo queue
@@ -269,10 +272,14 @@ gpioPin::gpioPin()
 
 void gpioPin::setType(uint8_t newType)
 {
-  #ifdef debugGPIO
-  Serial.print("(setType) ");
+
+  Serial.print("(setType) Pin:");
+  Serial.print(pin);
+  Serial.print(" Bit:");
+  Serial.print(bitNo);
+  Serial.print(" NewType:");
   Serial.println(newType);
-  #endif
+
   xSemaphoreTake(lock,portMAX_DELAY);
   type = newType;
   if(type == GPIO_DIGOUT)pinMode(pin,OUTPUT);
@@ -284,7 +291,6 @@ void gpioPin::setType(uint8_t newType)
     servo = new ServoEasing;
     servo->attach(pin,preset0);           // preset0 is the home position of the servo
 //    setEasingType(EASE_LINEAR);
-    target = preset0;
   }
   vTaskDelay(10 / portTICK_PERIOD_MS);          // in case we get called in a tight loop
   value = target;
@@ -349,7 +355,7 @@ void gpioPin::write(int demand)
       Serial.println(demand);
       digitalWrite(pin,demand);
       value = demand;
-      publish(bitNo,value);
+      //publish(bitNo,value);
     }
     else if((type == GPIO_PWM) || (type == GPIO_PWM_PULSE))
     {
@@ -366,8 +372,11 @@ void gpioPin::write(int demand)
     {
       target = demand;
     }
-    else value = demand;
-    publish(bitNo,value);
+    else 
+    {
+      value = demand;
+      publish(bitNo,value);
+    }
   }     
 }
 
@@ -483,6 +492,7 @@ void gpioPin::helper()
     if(type == GPIO_SERVO)servoController();
     if((type == GPIO_AIN) || (type == GPIO_DIGIN))inputPoller();
     if((type == GPIO_DIGOUT_PULSE) || (type == GPIO_PWM_PULSE))outputPulser();
+    if((type == GPIO_DIGOUT)||(type == GPIO_PWM)||(type == GPIO_NONE))outputHelper();
     vTaskDelay(10);
   }
 }
@@ -540,6 +550,20 @@ void gpioPin::inputPoller()
     }
   }
   vTaskDelay(rate / portTICK_PERIOD_MS);
+}
+
+void gpioPin::outputHelper()
+{
+  // Digital Output helper function (applies to GPIO_DIGOUT, GPIO_PWM only and GPIO_NONE)
+  // Check if background publishing has been requested
+  if(publishRate != 0)
+  {
+    if(millis()>nextPublish)
+    {
+      nextPublish = millis()+publishRate;
+      publish(bitNo,value);
+    }
+  }
 }
 
 void gpioPin::outputPulser()
@@ -625,14 +649,14 @@ void servoSaver(void * pvParameters)
     if (xQueueReceive(servoQueue, &receivedServo, portMAX_DELAY) == pdPASS) 
     {
       Serial.printf("[Servo] Received position for servo: %d, position: %d\n", receivedServo.bitNo, receivedServo.position);
-      if(millis() > receivedServo.timestamp)
+      while(millis() < receivedServo.timestamp)
       {
-        // Save the position to SPIFFS
-        writeServoPosition(SPIFFS, receivedServo.bitNo, receivedServo.position);
-        Serial.printf("[Servo] Saved position for servo: %d\n", receivedServo.bitNo);
+        // Save the servo position to SPIFFS or perform other actions
+        vTaskDelay(100 / portTICK_PERIOD_MS);
       }
-      // Save the servo position to SPIFFS or perform other actions
-      vTaskDelay(100 / portTICK_PERIOD_MS);
+      // Save the position to SPIFFS
+      writeServoPosition(SPIFFS, receivedServo.bitNo, receivedServo.position);
+      Serial.printf("[Servo] Saved position for servo: %d\n", receivedServo.bitNo);
     }
   }
 }
@@ -643,7 +667,6 @@ void gpioPin::publish(uint8_t bit, int aValue)
   {
     Serial.println("Publishing GPIO change");
     MQTTSensor payload;
-    payload.bank = GPIO_BANK;
     payload.bitNo = bit;
     payload.value = aValue;
     MQTTPublishSensor(payload); 

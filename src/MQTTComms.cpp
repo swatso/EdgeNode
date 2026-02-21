@@ -38,8 +38,6 @@ long MQTTConnectionTime;
 
 const char* baseSensorTopic = "iot/io/sensor/nn00";
 const char* baseTurnoutTopic = "iot/io/turnout/nn00";
-const char* baseReporterTopic = "iot/io/reporter/nn00";
-const char* baseDebugTopic = "iot/io/debug/nn00";
 const char* baseSoundTopic = "iot/io/sound/nn00";
 const char* soundAutoTrimTopic = "iot/io/sound/autotrim";
 const char* baseActionTopic = "iot/io/action/nn00";
@@ -48,31 +46,33 @@ char turnoutTopic[30];
 char reporterTopic[30];
 char soundTopic[30];
 char actionTopic[30];
-
-char debugTopic[30];
-boolean C0[16];
-boolean S0[16];
+char localDebugTopic[30];
+char globalDebugTopic[30];
+char localOperationsTopic[30];
+char globalOperationsTopic[30];
+//boolean C0[16];
+//boolean S0[16];
 char payloadTrue[] = "ACTIVE";
 char payloadFalse[] = "INACTIVE";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 TaskHandle_t MQTTSensorService;
-TaskHandle_t MQTTDebugService;
+TaskHandle_t MQTTMessageService;
 
 void setupMQTTComms() 
 {
   initTopics(node.getNodeIDstring());
   for(int i=0; i<16; i++)
   {
-    C0[i] = false;
-    S0[i] = false;
+    //C0[i] = false;
+    //S0[i] = false;
   } 
   client.setBufferSize(512);
   client.setServer(node.brokerIP, 1883);
   client.setCallback(MQTTcallback);
   xTaskCreatePinnedToCore(sensorReceiverTask, "Sensor Task", 2048, NULL, 1, &MQTTSensorService, 1);
-  xTaskCreatePinnedToCore(debugReceiverTask, "Debug Task", 2048, NULL, 1, &MQTTDebugService, 1);
+  xTaskCreatePinnedToCore(messageReceiverTask, "Message Task", 2048, NULL, 1, &MQTTMessageService, 1);
   connectMQTTClient();
   runMQTT.attach_ms(500, serviceConnection);
 }
@@ -192,9 +192,8 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
     // This is a Turnout topic
     Serial.print("(MQTTcallback) Turnout event:");
     Serial.println(event);
-    if ((char)payload[0] == 'T')C0[event]=true;
-    else C0[event]=false;
-    gpio[event].remoteWrite(C0[event]);
+    if ((char)payload[0] == 'T')gpio[event].remoteWrite(true);
+    else gpio[event].remoteWrite(false);
   }
   if (strncmp(topic, soundAutoTrimTopic, 21) == 0) 
   {
@@ -235,29 +234,41 @@ void sensorReceiverTask(void *pvParameters)
     // Wait indefinitely for data
     if (xQueueReceive(MQTTSensorQueue, &receivedSensor, portMAX_DELAY) == pdPASS) 
     {
-      Serial.printf("[Sensor] Received value: %d\n", receivedSensor.value);
-      sensorTopic[17]=receivedSensor.bitNo + 0x30;
-      if(sensorTopic[17] > 57)sensorTopic[17]+=7;
-//      if(receivedSensor.value > 0)publishMQTT(sensorTopic, payloadTrue);
-//      else publishMQTT(sensorTopic, payloadFalse);  
-        char payload[10];
-        sprintf(payload, "%d", receivedSensor.value);
-        publishMQTT(sensorTopic, payload);
+      switch(gpio[receivedSensor.bitNo].type)
+      {
+        case GPIO_NONE:
+        case GPIO_SERVO:
+        case GPIO_AIN:
+          char payload[10];
+          sprintf(payload, "%d", receivedSensor.value);
+          publishMQTT(sensorTopic, payload);
+          break;
+        case GPIO_DIGIN:
+        case GPIO_DIGOUT:
+        case GPIO_DIGOUT_PULSE:
+        case GPIO_PWM:
+          if(receivedSensor.value > 0)publishMQTT(sensorTopic, payloadTrue);
+          else publishMQTT(sensorTopic, payloadFalse);
+          break;
+        default:
+          Serial.println("Invalid sensor type in sensorReceiverTask");
+          break;
+      }
       vTaskDelay(100 / portTICK_PERIOD_MS);
     }
   }
 }
 
-// Receiver task: waits for debug data from the queue and publishes it
-void debugReceiverTask(void *pvParameters) 
+// Message Receiver task: waits for data from the message queue and publishes it
+void messageReceiverTask(void *pvParameters) 
 {
-  MQTTDebugPayload receivedMessage;
+  MQTTMessagePayload receivedMessage;
   while (true) {
     // Wait indefinitely for data
-    if (xQueueReceive(MQTTDebugQueue, &receivedMessage, portMAX_DELAY) == pdPASS) 
+    if (xQueueReceive(MQTTMessageQueue, &receivedMessage, portMAX_DELAY) == pdPASS) 
     {
-      Serial.printf("[Debug] Received value: %s\n", receivedMessage.message);
-      publishMQTT(debugTopic, receivedMessage.message);
+      Serial.printf("[Message] Received value: %s\n", receivedMessage.message);
+      publishMQTT(receivedMessage.topic, receivedMessage.message);
       vTaskDelay(100 / portTICK_PERIOD_MS); 
     }
   }
@@ -285,12 +296,6 @@ void initTopics(char* currentNodeID)
   for(i=0; i<30 && baseSensorTopic[i] != 0; i++)sensorTopic[i] = baseSensorTopic[i];
   sensorTopic[14]=currentNodeID[0];
   sensorTopic[15]=currentNodeID[1];  
-  for(i=0; i<30 && baseReporterTopic[i] != 0; i++)reporterTopic[i] = baseReporterTopic[i];
-  reporterTopic[16]=currentNodeID[0];  
-  reporterTopic[17]=currentNodeID[1];
-  for(i=0; i<30 && baseDebugTopic[i] != 0; i++)debugTopic[i] = baseDebugTopic[i];
-  debugTopic[13]=currentNodeID[0];  
-  debugTopic[14]=currentNodeID[1];
   for(i=0; i<30 && baseSoundTopic[i] != 0; i++)soundTopic[i] = baseSoundTopic[i];
   soundTopic[13]=currentNodeID[0];  
   soundTopic[14]=currentNodeID[1];
@@ -300,7 +305,10 @@ void initTopics(char* currentNodeID)
   Serial.println(turnoutTopic);
   Serial.println(sensorTopic);
   Serial.println(reporterTopic);
-  Serial.println(debugTopic);
+  Serial.println(localDebugTopic);
+  Serial.println(globalDebugTopic);
+  Serial.println(localOperationsTopic);
+  Serial.println(globalOperationsTopic);
   Serial.println(soundTopic);
   Serial.println(actionTopic);
 

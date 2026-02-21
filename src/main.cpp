@@ -9,6 +9,7 @@
 #include "action.h"
 #include "arduinoGlue.h"
 #include "system.h"
+#include "debugStream.h"
 
 String Version = "GPIO Test 05/Feb/26";
 
@@ -23,14 +24,25 @@ void setup()
   node.loadConfig();
   mp3.loadConfig();
   loadActionConfig();
-  loadServoPositions();
+  //loadServoPositions();
   setupApplication();
   setupGPIO();
+  loadServoPositions();
   setupWiFi();
   setupMQTTServices();
   setupMQTTComms();
   setupSound();
   setupAction();
+  // configure the debug streams with nodeID and whether to append the nodeID to the topic or not (for global topics)
+  localDebug.setNodeID(node.getNodeID());
+  localDebug.appendNodeID(false);
+  localOperations.setNodeID(node.getNodeID());
+  localOperations.appendNodeID(false);
+  globalDebug.setNodeID(node.getNodeID());
+  globalOperations.setNodeID(node.getNodeID());
+  globalDebug.appendNodeID(true);
+  globalOperations.appendNodeID(true);
+
   powerGPIO(true);
 
 Serial.print("Core:");
@@ -107,7 +119,7 @@ void loop()
 //pause(15000);
 //gpio[0].write(false);
 getSystemInfo();
-pause(15000);
+pause(60000);
 }
 
 
