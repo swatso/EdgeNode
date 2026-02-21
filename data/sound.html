@@ -65,16 +65,8 @@ console.log("getMP3PlayerStatus");
 			  var response = await fetch("//"+window.location.host+"/api/mp3Player/status");
 			  var data = await response.json();
 			  var resp = JSON.parse(JSON.stringify(data));
-        	  var ele = document.getElementById('currentTrack');	
-			  if(resp.currentTrack == -1)ele.innerText = "No Track Playing";
-	  		  else ele.innerText = resp.currentTrack;
-
-			  ele = document.getElementById('currentVolume');	
-	  		  ele.innerText = resp.currentVolume;
-
 			  ele = document.getElementById('manualTrimInput');	
 	  		  ele.value = resp.manualTrim;
-
 			  ele = document.getElementById('autoTrimInput');	
 	  		  ele.value = resp.autoTrim;
 			};
@@ -181,13 +173,7 @@ console.log("getSoundTrackStatus" + trackNo);
   	<body onload = "init()">
 		
   		<h1><p font-size: 30 px;text-align: "centre";color: #444444; id="header";></p>MP3 Player</h1>
-  		</br>
-  		    current volume</br>
-			<span id="currentVolume">-Loading</span>
-		</br></br>
-		    current track</br>
-			<span id="currentTrack">-Loading</span>
-		</br></br>
+  		</br></br>
 		    Manual volume trim</br>
 			<input type="text" id="manualTrimInput" name="manualTrimInput" value="-Loading..."></br>
 		</br></br>

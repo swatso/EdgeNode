@@ -2,7 +2,7 @@
   <html>
   	<head>
 	  	<meta name="viewport" content="width=device-width, initial-scale=1">
-  		<title>Breaker</title>
+  		<title>NodeConfig</title>
   		<link rel="shortcut icon" href="/favicon">
   		<style>
 			left-align {text-align: left;}
@@ -50,8 +50,10 @@ console.log(out);
 			async function postNodeConfig() 
 			{
             	var ele = document.getElementById('NodeID');
+				var nodeID = ele.value
+				nodeID = nodeID.toUpperCase();
   			   	var url = "//"+window.location.host+"/api/nodeid/value";
-              		   var out = '{"value":"' + ele.value + '"}';
+              	var out = '{"value":"' + nodeID + '"}';
 console.log(out);
  			   	postit(url,out);
 
