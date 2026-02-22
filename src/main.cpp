@@ -18,13 +18,12 @@ String Version = "GPIO Test 05/Feb/26";
 void setup()
 {
   Serial.begin(115200);           // for debug only
+  powerGPIO(false);
   delay(2000);
-  
   setupSPIFFS();
   node.loadConfig();
   mp3.loadConfig();
   loadActionConfig();
-  //loadServoPositions();
   setupApplication();
   setupGPIO();
   loadServoPositions();

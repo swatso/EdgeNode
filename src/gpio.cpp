@@ -106,7 +106,7 @@ void  setupGPIO()
     // Create servo queue
   servoQueue = xQueueCreate(50, sizeof(servoData));
   if (servoQueue == NULL) Serial.println("Error creating the servo queue");
-  else xTaskCreatePinnedToCore(servoSaver, "ServoSaver", 2000, NULL, 1, &servoSaverTask, 0); // Core 0
+  else xTaskCreatePinnedToCore(servoSaver, "ServoSaver", 3000, NULL, 1, &servoSaverTask, 0); // Core 0
 
   // Create helper tasks for each GPIO pin
   xTaskCreatePinnedToCore(helper0, "GPIO0", 2000, NULL, 1, &gpioTask0, 0); // Core 0
@@ -137,16 +137,27 @@ pinMode(POWER_GPIO,OUTPUT);
 digitalWrite(POWER_GPIO, powerUp);
 }
 
+bool  GPIOstate()
+{
+  // Returns true if th GPIO system is running (pwered up)
+  return digitalRead(POWER_GPIO);
+}
+
 void loadServoPositions()
 {
+  Serial.println("Loading servo positions from SPIFFS");
   // Load the last saved servo positions from the SPIFFS file system
   for(int bit=0; bit<16; bit++)
   {
     int position = readServoPosition(SPIFFS, bit);
-    if(position >= 0)
+    Serial.print("Servo bit:");
+    Serial.print(bit);  
+    Serial.print(" Position:");
+    Serial.println(position);
+    if((position >= 0) && (position <= 180) && (gpio[bit].type == GPIO_SERVO))
     {
       Serial.printf("Loaded position for servo %d: %d\n", bit, position);
-      gpio[bit].localWrite(position);
+      gpio[bit].initValue(position);
     }
   }
 }
@@ -295,6 +306,19 @@ void gpioPin::setType(uint8_t newType)
   vTaskDelay(10 / portTICK_PERIOD_MS);          // in case we get called in a tight loop
   value = target;
 // Publish
+  xSemaphoreGive(lock);
+}
+
+void gpioPin::initValue(int initValue)
+{
+  // This is called after the GPIO type has been set to initialise the value of the GPIO (eg to set the initial position of a servo)
+  xSemaphoreTake(lock,portMAX_DELAY);
+  if(type == GPIO_SERVO)
+  {
+    target = initValue;
+    servo->write(initValue);
+    value = initValue;
+  }
   xSemaphoreGive(lock);
 }
 
@@ -505,7 +529,7 @@ void gpioPin::servoController()
     {
       servo->easeTo(target, rate);
       value = read();
-      vTaskDelay(100 / portTICK_PERIOD_MS);
+      vTaskDelay(10 / portTICK_PERIOD_MS);
     }
     queServoPosition(bitNo, value, SERVO_SETTLING_DELAY);         // queue the current servo position for saving to SPIFFS after a delay to allow the servo to settle
     publish(bitNo,value);                                         //  publish (MQTT) the final position after the easeTo has completed
@@ -655,15 +679,22 @@ void servoSaver(void * pvParameters)
         vTaskDelay(100 / portTICK_PERIOD_MS);
       }
       // Save the position to SPIFFS
-      writeServoPosition(SPIFFS, receivedServo.bitNo, receivedServo.position);
-      Serial.printf("[Servo] Saved position for servo: %d\n", receivedServo.bitNo);
+      if(GPIOstate() == true)
+      {
+        // Check if servo is still at the same position before saving (ie it has not been moved again since we queued the save)
+        if(gpio[receivedServo.bitNo].getValue() == receivedServo.position)
+        {
+          writeServoPosition(SPIFFS, receivedServo.bitNo, receivedServo.position);
+          Serial.printf("[Servo] Saved position for servo: %d\n", receivedServo.bitNo);
+        }
+      }
     }
   }
 }
 
 void gpioPin::publish(uint8_t bit, int aValue)
 {
-  if(digitalRead(POWER_GPIO) == HIGH)   // only publish if power to the GPIOs is on
+  if(GPIOstate() == true)   // only publish if power to the GPIOs is on
   {
     Serial.println("Publishing GPIO change");
     MQTTSensor payload;

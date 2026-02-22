@@ -35,6 +35,7 @@ void getSystemInfo()
     vCheckStackFreeSpace(gpioTask13);
     vCheckStackFreeSpace(gpioTask14);
     vCheckStackFreeSpace(gpioTask15);
+    vCheckStackFreeSpace(servoSaverTask);
 }
 
 

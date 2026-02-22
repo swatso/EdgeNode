@@ -15,6 +15,7 @@ const char* nodeConfigPath = "/config#.txt";
 const char* trackConfigPath = "/trackConfig#.txt";
 const char* actionConfigPath = "/actionConfig#.txt";
 const char* servoConfigPath = "/servoConfig#.txt";
+SemaphoreHandle_t fsLock;
 
 // Initialize SPIFFS
 void setupSPIFFS() 
@@ -24,6 +25,7 @@ void setupSPIFFS()
     Serial.println("An error has occurred while mounting SPIFFS");
   }
   Serial.println("SPIFFS mounted successfully");
+  fsLock = xSemaphoreCreateMutex();
 }
 
 // Read a File from SPIFFS, if the file does not exist then a new one is created to store the default string (deft)
@@ -32,6 +34,7 @@ char* readFileC(fs::FS &fs, const char *path, const char *deft)
 {
   Serial.printf("(readFileC): %s\r\n", path);
   vTaskDelay(20);
+  xSemaphoreTake(fsLock,portMAX_DELAY);
   static char fileContent[20];
   uint8_t i;
   for(i=0; i<20; i++)fileContent[i]='\0';     // clear the static buffer
@@ -44,6 +47,7 @@ char* readFileC(fs::FS &fs, const char *path, const char *deft)
     fileContent[i]='\0';
 //Serial.println(fileContent);
     writeFile(SPIFFS, path, fileContent);
+    xSemaphoreGive(fsLock);
     return (&fileContent[0]);
   }
   // file is available, read it
@@ -67,6 +71,8 @@ char* readFileC(fs::FS &fs, const char *path, const char *deft)
 //    Serial.println("ReadFileC");
 //    for(i=0; i<=e; i++)Serial.printf("%d \n",fileContent[i]);
 //    Serial.println("done");
+  file.close();
+  xSemaphoreGive(fsLock);
   return(&fileContent[0]);
 }
 
@@ -83,6 +89,7 @@ String readFile(fs::FS &fs, const char *path, const char *deft)
     Serial.println(deft);
     writeFile(SPIFFS, path, deft);
     file.close();
+    xSemaphoreGive(fsLock);
     return (deft);
   }
   String fileContent;
@@ -102,6 +109,7 @@ void writeFile(fs::FS &fs, const char * path, const char * message)
   Serial.printf("Writing char* to file: %s\r\n", path);
   Serial.println(message);
 
+  xSemaphoreTake(fsLock,portMAX_DELAY);
   File file = fs.open(path, FILE_WRITE);
   if(!file){
     Serial.println("- failed to open file for writing");
@@ -116,6 +124,7 @@ void writeFile(fs::FS &fs, const char * path, const char * message)
     Serial.println("- write failed");
   }
   file.close();
+  xSemaphoreGive(fsLock);
 }
 
 // Write single integer to SPIFFS
@@ -123,10 +132,12 @@ void writeFile(fs::FS &fs, const char * path, int value)
 {
   Serial.printf("Writing integer to file: %s\r\n", path);
 
+  xSemaphoreTake(fsLock,portMAX_DELAY);
   File file = fs.open(path, FILE_WRITE);
   if(!file)
   {
     Serial.println("- failed to open file for writing");
+    xSemaphoreGive(fsLock);
     return;
   }
   if(file.print(value))
@@ -138,31 +149,37 @@ void writeFile(fs::FS &fs, const char * path, int value)
     Serial.println("- write failed");
   }
   file.close();
+  xSemaphoreGive(fsLock);
 }
 
 void writeMP3ConfigFile(fs::FS &fs)
 {
   Serial.println("Writing MP3 config file");
+  xSemaphoreTake(fsLock,portMAX_DELAY);
   File file = fs.open("/mp3Config.txt", FILE_WRITE);
   if(!file)
   {
     Serial.println("- failed to open mp3 config file for writing");
+    xSemaphoreGive(fsLock);
     return;
   }
   file.println(mp3.currentTrack);
   file.println(mp3.currentVolume);
   file.println(mp3.manualTrim);
   file.println(mp3.autoTrim);
+  xSemaphoreGive(fsLock);
   file.close();
 }
 
 void readMP3ConfigFile(fs::FS &fs)
 {
   Serial.println("Reading MP3 config file");
+  xSemaphoreTake(fsLock,portMAX_DELAY);
   File file = fs.open("/mp3Config.txt", FILE_READ);
   if(!file)
   {
     Serial.println("- failed to open mp3 config file for reading");
+    xSemaphoreGive(fsLock);
     return;
   }
   if(file.size() == 0)
@@ -170,19 +187,21 @@ void readMP3ConfigFile(fs::FS &fs)
     // config file is empty, so just leave the hardcoded defaults
     file.close();
     Serial.println("No File");
+    xSemaphoreGive(fsLock);
     return;
   }
   mp3.currentTrack = std::stoi(readConfigItem(file),NULL,10);
   mp3.currentVolume = std::stoi(readConfigItem(file),NULL,10);
   mp3.manualTrim = std::stoi(readConfigItem(file),NULL,10);
   mp3.autoTrim = std::stoi(readConfigItem(file),NULL,10);
+  xSemaphoreGive(fsLock);
   file.close();
 }
 
 void writeMP3TrackConfigFile(fs::FS &fs, uint8_t trackNo)
 {
   Serial.println("Writing MP3 Track config file");
-
+  xSemaphoreTake(fsLock,portMAX_DELAY);
   vTaskDelay(100);
   char path[30];
   uint8_t i,j;
@@ -202,6 +221,7 @@ void writeMP3TrackConfigFile(fs::FS &fs, uint8_t trackNo)
   if(!file)
   {
     Serial.println("- failed to open mp3 track config file for writing");
+    xSemaphoreGive(fsLock);
     return;
   }
   file.println(mp3.track[trackNo].name);
@@ -210,12 +230,14 @@ void writeMP3TrackConfigFile(fs::FS &fs, uint8_t trackNo)
   file.println(mp3.track[trackNo].enableLocal);
   file.println(mp3.track[trackNo].enableRemote);
   file.close();
+  xSemaphoreGive(fsLock);
 }
 
 void readMP3TrackConfigFile(fs::FS &fs, uint8_t trackNo)
 {
   Serial.print("Reading MP3 Track config file: ");
   Serial.println(trackNo);
+  xSemaphoreTake(fsLock,portMAX_DELAY);
   vTaskDelay(10);
   char path[30];
   uint8_t i,j;
@@ -235,6 +257,7 @@ void readMP3TrackConfigFile(fs::FS &fs, uint8_t trackNo)
   if(!file)
   {
     Serial.println("- failed to open mp3 track config file for reading");
+    xSemaphoreGive(fsLock);
     return;
   }
   if(file.size() == 0)
@@ -242,6 +265,7 @@ void readMP3TrackConfigFile(fs::FS &fs, uint8_t trackNo)
     // config file is empty, so just leave the hardcoded defaults
     file.close();
     Serial.println("No File");
+    xSemaphoreGive(fsLock);
     return;
   }
   char buffer[20];
@@ -266,13 +290,14 @@ void readMP3TrackConfigFile(fs::FS &fs, uint8_t trackNo)
   Serial.println(mp3.track[trackNo].enableRemote);
 
   file.close();
+  xSemaphoreGive(fsLock);
 }
 
 void writeServoPosition(fs::FS &fs, uint8_t bitNo, int position)
 {
   Serial.print("Writing Servo config file:");
   Serial.println(bitNo);
-
+  xSemaphoreTake(fsLock,portMAX_DELAY);
   vTaskDelay(100);
   char path[30];
   uint8_t i,j;
@@ -288,20 +313,27 @@ void writeServoPosition(fs::FS &fs, uint8_t bitNo, int position)
     }
   }
   path[j]=0;
+
+Serial.print("Writing servo config file to: ");
+Serial.println(path);
+
   File file = fs.open(path, FILE_WRITE);
   if(!file)
   {
     Serial.println("- failed to open servo config file for writing");
+    xSemaphoreGive(fsLock);
     return;
   }
   file.println(position);
   file.close();
+  xSemaphoreGive(fsLock);
 }
 
 int readServoPosition(fs::FS &fs, uint8_t bitNo)
 {
   Serial.print("Reading servo config file: ");
   Serial.println(bitNo);
+  xSemaphoreTake(fsLock,portMAX_DELAY);
   vTaskDelay(10);
   char path[30];
   uint8_t i,j;
@@ -321,6 +353,7 @@ int readServoPosition(fs::FS &fs, uint8_t bitNo)
   if(!file)
   {
     Serial.println("- failed to open servo config file for reading");
+    xSemaphoreGive(fsLock);
     return(-1);
   }
   if(file.size() == 0)
@@ -328,12 +361,20 @@ int readServoPosition(fs::FS &fs, uint8_t bitNo)
     // config file is empty, so just leave the hardcoded defaults
     file.close();
     Serial.println("No File");
+    xSemaphoreGive(fsLock);
     return(-1);
   }
+Serial.println("File found");
   int position = std::stoi(readConfigItem(file),NULL,10);
+//  char buffer[20];
+//  int l = file.readBytesUntil('\n',buffer,sizeof(buffer));
+//  buffer[l-1]='\0';
+//  int position = std::stoi(buffer,NULL,10);
+Serial.println(readConfigItem(file));
 Serial.print("position: ");
 Serial.println(position);
   file.close();
+  xSemaphoreGive(fsLock);
   return position;
 }
 
@@ -341,7 +382,7 @@ void writeActionConfigFile(fs::FS &fs, uint8_t number)
 {
   Serial.print("Writing Action config file:");
   Serial.println(number);
-
+  xSemaphoreTake(fsLock,portMAX_DELAY);
   vTaskDelay(100);
   char path[30];
   uint8_t i,j;
@@ -361,18 +402,21 @@ void writeActionConfigFile(fs::FS &fs, uint8_t number)
   if(!file)
   {
     Serial.println("- failed to action config file for writing");
+    xSemaphoreGive(fsLock);
     return;
   }
   file.println(action[number].number);
   file.println(action[number].enableLocal);
   file.println(action[number].enableRemote);
   file.close();
+  xSemaphoreGive(fsLock);
 }
 
 void readActionConfigFile(fs::FS &fs, uint8_t number)
 {
   Serial.print("Reading action config file: ");
   Serial.println(number);
+  xSemaphoreTake(fsLock,portMAX_DELAY);
   vTaskDelay(10);
   char path[30];
   uint8_t i,j;
@@ -392,6 +436,7 @@ void readActionConfigFile(fs::FS &fs, uint8_t number)
   if(!file)
   {
     Serial.println("- failed to open action config file for reading");
+    xSemaphoreGive(fsLock);
     return;
   }
   if(file.size() == 0)
@@ -399,6 +444,7 @@ void readActionConfigFile(fs::FS &fs, uint8_t number)
     // config file is empty, so just leave the hardcoded defaults
     file.close();
     Serial.println("No File");
+    xSemaphoreGive(fsLock);
     return;
   }
   action[number].number = std::stoi(readConfigItem(file),NULL,10);
@@ -413,6 +459,7 @@ void readActionConfigFile(fs::FS &fs, uint8_t number)
   Serial.println(action[number].enableRemote);
 
   file.close();
+  xSemaphoreGive(fsLock);
 }
 
 // Write gpio bit configuration to SPIFFS
@@ -420,6 +467,7 @@ void readActionConfigFile(fs::FS &fs, uint8_t number)
 void writeConfigFile(fs::FS &fs, uint8_t bit)
 {
   Serial.println("Writing gpio bit config file");
+  xSemaphoreTake(fsLock,portMAX_DELAY);
   vTaskDelay(10);
   char path[30];
   uint8_t i,j;
@@ -442,6 +490,7 @@ Serial.println(path);
   if(!file)
   {
     Serial.println("- failed to open config file for writing");
+    xSemaphoreGive(fsLock);
     return;
   }
   file.println(gpio[bit].name);
@@ -455,7 +504,7 @@ Serial.println(path);
   file.println(gpio[bit].enableLocal);
   file.println(gpio[bit].getPublishRate());
   file.close();
-
+  xSemaphoreGive(fsLock);
   Serial.println(gpio[bit].type);
   Serial.println(gpio[bit].preset0);
   Serial.println(gpio[bit].preset1);
@@ -490,6 +539,7 @@ void readConfigFile(fs::FS &fs, uint8_t bit)
 {
   Serial.print("Reading node config file for bit");
   Serial.println(bit);
+  xSemaphoreTake(fsLock,portMAX_DELAY);
   char path[30];
   uint8_t i,j;
   for(i=0, j=0; nodeConfigPath[i] != 0; i++)
@@ -508,6 +558,7 @@ void readConfigFile(fs::FS &fs, uint8_t bit)
   if(!file)
   {
     Serial.println("- failed to open config file for reading");
+    xSemaphoreGive(fsLock); 
     return;
   }
   if(file.size() == 0)
@@ -515,6 +566,7 @@ void readConfigFile(fs::FS &fs, uint8_t bit)
     // config file is empty, so just leave the hardcoded defaults
     file.close();
     Serial.println("No File");
+    xSemaphoreGive(fsLock);
     return;
   }
   char buffer[20];
@@ -546,12 +598,15 @@ void readConfigFile(fs::FS &fs, uint8_t bit)
   gpio[bit].enableLocal = std::stoi(readConfigItem(file),NULL,10);
   gpio[bit].setPublishRate(std::stoi(readConfigItem(file),NULL,10));
   file.close();
+  xSemaphoreGive(fsLock);
   Serial.println("Done");
 }
 
 void  deleteFile(fs::FS &fs, const char * path)
 {
+  xSemaphoreTake(fsLock,portMAX_DELAY);
   fs.remove(path);
+  xSemaphoreGive(fsLock);
 }
 
 char* hashPath(const char* path, uint8_t bit)

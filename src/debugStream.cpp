@@ -3,6 +3,7 @@
 //
 #include "debugStream.h"
 #include "MQTTServices.h"
+#include "gpio.h"
 #include <cstring>
 
     // Constructor - accepts topic string
@@ -77,7 +78,7 @@
             messagePayload.topic[sizeof(messagePayload.topic) - 1] = '\0';
             strncpy(messagePayload.message, payload, sizeof(messagePayload.message) - 1);
             messagePayload.message[sizeof(messagePayload.message) - 1] = '\0';
-            MQTTPublishMessage(messagePayload);  // publish the message to MQTT
+            if(GPIOstate() == true)MQTTPublishMessage(messagePayload);  // publish the message to MQTT
         }
         return written;
     }
