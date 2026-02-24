@@ -54,7 +54,7 @@ char globalOperationsTopic[30];
 //boolean S0[16];
 char payloadTrue[] = "ACTIVE";
 char payloadFalse[] = "INACTIVE";
-
+char payloadCentre[] = "MIDDLE";
 WiFiClient espClient;
 PubSubClient client(espClient);
 TaskHandle_t MQTTSensorService;
@@ -179,7 +179,6 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
 {
   // Called when one of the subscribed topics is recieved
   // ie a Turnout has changed in value...
-  // Toggle bits in C0
   // Event will be defined by topic[17] and topic[18] in the range 00 to 0F hex
   byte event = (topic[18]-0x30);
   if (event > 9)event -= 7;
@@ -192,8 +191,26 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
     // This is a Turnout topic
     Serial.print("(MQTTcallback) Turnout event:");
     Serial.println(event);
-    if ((char)payload[0] == 'T')gpio[event].remoteWrite(true);
-    else gpio[event].remoteWrite(false);
+    if(gpio[event].type == GPIO_SERVO_ACTUATOR)
+    {
+        // Move the servo to the preset position based on the payload value (T for preset2, M for preset1, anything else for preset0)
+        if ((char)payload[0] == 'T')gpio[event].remoteWrite(gpio[event].preset2);
+        else if ((char)payload[0] == 'M')gpio[event].remoteWrite(gpio[event].preset1);
+        else gpio[event].remoteWrite(gpio[event].preset0); 
+    }
+    else if(gpio[event].type == GPIO_SERVO)
+    {
+      // Set the gpio bit based on the payload value (T for true, anything else for false) 
+      gpio[event].remoteWrite(std::stoi((char*)payload));
+      Serial.print("(MQTTcallback) Payload as int:");
+      Serial.println(std::stoi((char*)payload));
+    }
+    else
+    {
+      // Set the gpio bit based on the payload value (T for true, anything else for false) 
+      if ((char)payload[0] == 'T')gpio[event].remoteWrite(true);
+      else gpio[event].remoteWrite(false);
+    }
   }
   if (strncmp(topic, soundAutoTrimTopic, 21) == 0) 
   {
@@ -250,6 +267,12 @@ void sensorReceiverTask(void *pvParameters)
           if(receivedSensor.value > 0)publishMQTT(sensorTopic, payloadTrue);
           else publishMQTT(sensorTopic, payloadFalse);
           break;
+          case GPIO_SERVO_ACTUATOR:
+            // For servo actuators we want to publish a true/false/Centre topic based on whether the servo is at the preset position or not
+            if(receivedSensor.value == gpio[receivedSensor.bitNo].preset2)publishMQTT(sensorTopic, payloadTrue);
+            else if(receivedSensor.value == gpio[receivedSensor.bitNo].preset1)publishMQTT(sensorTopic, payloadCentre);
+            else if(receivedSensor.value == gpio[receivedSensor.bitNo].preset0)publishMQTT(sensorTopic, payloadFalse);
+            break;
         default:
           Serial.println("Invalid sensor type in sensorReceiverTask");
           break;

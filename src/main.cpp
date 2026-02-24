@@ -10,6 +10,7 @@
 #include "arduinoGlue.h"
 #include "system.h"
 #include "debugStream.h"
+#include "UserCode.h"
 
 String Version = "GPIO Test 05/Feb/26";
 
@@ -32,6 +33,7 @@ void setup()
   setupMQTTComms();
   setupSound();
   setupAction();
+  setupUserCode();
   // configure the debug streams with nodeID and whether to append the nodeID to the topic or not (for global topics)
   localDebug.setNodeID(node.getNodeID());
   localDebug.appendNodeID(false);

@@ -296,6 +296,7 @@ void edgeAction::helper()
         if(demandedState == DEMAND_PLAY)state = ACTION_PLAYING;
         else
         {
+          userState = 1;                  // reset userState for the next run action
           demandedState = DEMAND_STOP;
           vTaskDelay(100);
         }
@@ -318,7 +319,7 @@ void edgeAction::helper()
         delayTime = fpPlay(number);       // call the user defined play function to execute the action behavior and get the delay time for the next state transition
         if(delayTime == 0)
         {
-          // User sequence has finnished
+          // User sequence has finished
           if(demandedState == DEMAND_FINNISH)repeat = false;
           state = ACTION_PLAYED;
           break;
@@ -326,6 +327,7 @@ void edgeAction::helper()
         // User sequence is still playing...
         if(demandedState == DEMAND_STOP)
         {
+          userState = 1;              // reset userState for the stopping action
           state = ACTION_STOPPING;
           repeat = false;
         }
@@ -333,9 +335,10 @@ void edgeAction::helper()
         break;
 
         case ACTION_PLAYED:
-        // execute the action sequence
+        // the action sequence has completed
         if((demandedState == DEMAND_FINNISH) || (demandedState == DEMAND_STOP))
         {
+          userState = 1;              // reset userState for the stopping action
           state = ACTION_STOPPING;
           repeat = false;
         }

@@ -154,7 +154,7 @@ void loadServoPositions()
     Serial.print(bit);  
     Serial.print(" Position:");
     Serial.println(position);
-    if((position >= 0) && (position <= 180) && (gpio[bit].type == GPIO_SERVO))
+    if((position >= 0) && (position <= 180) && ((gpio[bit].type == GPIO_SERVO)||(gpio[bit].type == GPIO_SERVO_ACTUATOR)))
     {
       Serial.printf("Loaded position for servo %d: %d\n", bit, position);
       gpio[bit].initValue(position);
@@ -297,7 +297,7 @@ void gpioPin::setType(uint8_t newType)
   if(type == GPIO_DIGOUT_PULSE)pinMode(pin,OUTPUT);
   if(type == GPIO_DIGIN)pinMode(pin,INPUT_PULLUP);
   if(type == GPIO_AIN)pinMode(pin,INPUT);
-  if(type == GPIO_SERVO)
+  if((type == GPIO_SERVO)||(type == GPIO_SERVO_ACTUATOR))
   {
     servo = new ServoEasing;
     servo->attach(pin,preset0);           // preset0 is the home position of the servo
@@ -313,7 +313,7 @@ void gpioPin::initValue(int initValue)
 {
   // This is called after the GPIO type has been set to initialise the value of the GPIO (eg to set the initial position of a servo)
   xSemaphoreTake(lock,portMAX_DELAY);
-  if(type == GPIO_SERVO)
+  if((type == GPIO_SERVO)||(type == GPIO_SERVO_ACTUATOR))
   {
     target = initValue;
     servo->write(initValue);
@@ -379,7 +379,7 @@ void gpioPin::write(int demand)
       Serial.println(demand);
       digitalWrite(pin,demand);
       value = demand;
-      //publish(bitNo,value);
+      publish(bitNo,value);
     }
     else if((type == GPIO_PWM) || (type == GPIO_PWM_PULSE))
     {
@@ -392,7 +392,7 @@ void gpioPin::write(int demand)
       Serial.println(preset2);
       publish(bitNo,value);
     }
-    else if(type == GPIO_SERVO)
+    else if((type == GPIO_SERVO)||(type == GPIO_SERVO_ACTUATOR))
     {
       target = demand;
     }
@@ -466,6 +466,7 @@ int  gpioPin::read()
       }
       break;
     case  GPIO_SERVO:
+    case  GPIO_SERVO_ACTUATOR:
       val = servo->read();
       break;
   }
@@ -495,7 +496,7 @@ int  gpioPin::getPublishRate()
 void  gpioPin::setEasingType(uint_fast8_t aEasingType)
 {
   xSemaphoreTake(lock,portMAX_DELAY);
-  if(type == GPIO_SERVO)
+  if((type == GPIO_SERVO)||(type == GPIO_SERVO_ACTUATOR))
   {
     easingType = aEasingType;
     servo->setEasingType(easingType);
@@ -505,7 +506,7 @@ void  gpioPin::setEasingType(uint_fast8_t aEasingType)
 
 int  gpioPin::getEasingType()
 {
-  if(type == GPIO_SERVO)return(servo->getEasingType());
+  if((type == GPIO_SERVO)||(type == GPIO_SERVO_ACTUATOR))return(servo->getEasingType());
   else return(0);
 }
 
@@ -513,7 +514,7 @@ void gpioPin::helper()
 {
   while(true)
   {
-    if(type == GPIO_SERVO)servoController();
+    if((type == GPIO_SERVO)||(type == GPIO_SERVO_ACTUATOR))servoController();
     if((type == GPIO_AIN) || (type == GPIO_DIGIN))inputPoller();
     if((type == GPIO_DIGOUT_PULSE) || (type == GPIO_PWM_PULSE))outputPulser();
     if((type == GPIO_DIGOUT)||(type == GPIO_PWM)||(type == GPIO_NONE))outputHelper();
@@ -523,7 +524,7 @@ void gpioPin::helper()
 
 void gpioPin::servoController()
 {
-  if(type == GPIO_SERVO)
+  if((type == GPIO_SERVO)||(type == GPIO_SERVO_ACTUATOR))
   {
     while(value != target)
     {
@@ -532,7 +533,7 @@ void gpioPin::servoController()
       vTaskDelay(10 / portTICK_PERIOD_MS);
     }
     queServoPosition(bitNo, value, SERVO_SETTLING_DELAY);         // queue the current servo position for saving to SPIFFS after a delay to allow the servo to settle
-    publish(bitNo,value);                                         //  publish (MQTT) the final position after the easeTo has completed
+    publish(bitNo,value);                                     //  publish (MQTT) the final position after the easeTo has completed
     while(value == target)
     {
       if(publishRate != 0)

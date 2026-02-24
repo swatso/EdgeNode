@@ -145,10 +145,11 @@ console.log("type:" + type);
     				<input type="radio" name= "type" Id="type1" value="1" 0/>PWM
     				<input type="radio" name= "type" Id="type2" value="2" 0/>DIGOUT
     				<input type="radio" name= "type" Id="type3" value="3" 0/>SERVO
-    				<input type="radio" name= "type" Id="type4" value="4" 0/>DIGIN
-    				<input type="radio" name= "type" Id="type5" value="5" 0/>AIN
-    				<input type="radio" name= "type" Id="type6" value="6" 0/>DIGOUT_PULSE
-    				<input type="radio" name= "type" Id="type7" value="7" 0/>PWM_PULSE
+					<input type="radio" name= "type" Id="type4" value="4" 0/>SERVO_ACTUATOR
+    				<input type="radio" name= "type" Id="type5" value="5" 0/>DIGIN
+    				<input type="radio" name= "type" Id="type6" value="6" 0/>AIN
+    				<input type="radio" name= "type" Id="type7" value="7" 0/>DIGOUT_PULSE
+    				<input type="radio" name= "type" Id="type8" value="8" 0/>PWM_PULSE
     			</td>
 				<td width=40%">
 					<span></span>
@@ -162,10 +163,11 @@ console.log("type:" + type);
 					<span id="type11" >Not Used</span>
 					<span id="type21" >Not Used</span>
 					<span id="type31" >Angle preset 0-180 deg</span>
-					<span id="type41" >Not Used</span>
+					<span id="type41" >Angle preset 0-180 deg</span>
 					<span id="type51" >Not Used</span>
-					<span id="type61" >Mark Period (mS)</span>
+					<span id="type61" >Not Used</span>
 					<span id="type71" >Mark Period (mS)</span>
+					<span id="type81" >Mark Period (mS)</span>
 				</td>
 			</tr>
 			<tr>
@@ -176,10 +178,11 @@ console.log("type:" + type);
 				<span id="type12">OFF PWM frequency (0-255)</span>
 				<span id="type22">Not Used</span>
 				<span id="type32">Angle preset 0-180 deg</span>
-				<span id="type42">Not Used</span>
+				<span id="type42">Angle preset 0-180 deg</span>
 				<span id="type52">Not Used</span>
 				<span id="type62">Not Used</span>
 				<span id="type72">OFF PWM frequency (0-255)</span>
+				<span id="type82">OFF PWM frequency (0-255)</span>
 				</td>
 			</tr>
 			<tr>
@@ -190,10 +193,11 @@ console.log("type:" + type);
 					<span id="type13">ON PWM frequency (0-255)</span>
 					<span id="type23">Not Used</span>
 					<span id="type33">Angle preset 0-180 deg</span>
-					<span id="type43">Not Used</span>
+					<span id="type43">Angle preset 0-180 deg</span>	
 					<span id="type53">Not Used</span>
 					<span id="type63">Not Used</span>
-					<span id="type73">ON PWM frequency (0-255)</span>				
+					<span id="type73">ON PWM frequency (0-255)</span>
+					<span id="type83">ON PWM frequency (0-255)</span>				
 				</td>
 			</tr>
 			<tr>
@@ -204,10 +208,11 @@ console.log("type:" + type);
 					<span id="type14">Not Used</span>
 					<span id="type24">Not Used</span>
 					<span id="type34">Slew Rate (degrees per second)</span>
-					<span id="type44">Input Polling Rate (mS)</span>
+					<span id="type44">Slew Rate (degrees per second)</span>
 					<span id="type54">Input Polling Rate (mS)</span>
-					<span id="type64">Cycle Period (mS)</span>
-					<span id="type74">Cycle Period (mS)</span>				
+					<span id="type64">Input Polling Rate (mS)</span>
+					<span id="type74">Cycle Period (mS)</span>
+					<span id="type84">Cycle Period (mS)</span>				
 				</td>
 			</tr>
 			<tr id="ServoEasing">
@@ -253,10 +258,11 @@ console.log("type:" + type);
 					<span id="type15" style="display:none">Not Used</span>
 					<span id="type25" style="display:none">Not Used</span>
 					<span id="type35" style="display:none">Select easing type</span>
-					<span id="type45" style="display:none">Not Used</span>
+					<span id="type45" style="display:none">Select easing type</span>
 					<span id="type55" style="display:none">Not Used</span>
 					<span id="type65" style="display:none">Not Used</span>
 					<span id="type75" style="display:none">Not Used</span>
+					<span id="type85" style="display:none">Not Used</span>
 				</td>
 			</tr>
 			<tr>
@@ -288,6 +294,7 @@ console.log("type:" + type);
 					<span id="type58">Background MQTT Publish Rate (mS) -even if value does not change</span>
 					<span id="type68">Background MQTT Publish Rate (mS) -even if value does not change</span>
 					<span id="type78">Background MQTT Publish Rate (mS) -even if value does not change</span>
+					<span id="type88">Background MQTT Publish Rate (mS) -even if value does not change</span>
 				</td>
 			</tr>
 			</table>

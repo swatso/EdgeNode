@@ -40,11 +40,13 @@ bool GPIOstate();
 #define GPIO_NONE   0
 #define GPIO_PWM    1
 #define GPIO_DIGOUT 2
-#define GPIO_SERVO  3
-#define GPIO_DIGIN  4
-#define GPIO_AIN 5
-#define GPIO_DIGOUT_PULSE 6
-#define GPIO_PWM_PULSE 7
+#define GPIO_SERVO 3
+#define GPIO_SERVO_ACTUATOR 4
+#define GPIO_DIGIN  5
+#define GPIO_AIN 6
+#define GPIO_DIGOUT_PULSE 7
+#define GPIO_PWM_PULSE 8
+
 
 void queServoPosition(uint8_t bitNo, int position, unsigned int delay);
 
