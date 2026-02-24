@@ -26,6 +26,7 @@ void setupUserCode()
     // User code setup
     // This function is called at the end of setup() in main.cpp and can be used to perform any user defined setup required for the action sequences, such as configuring GPIOs, initializing sensors, etc.
     // For example, to set the play and stop functions for Action 0 to the template functions defined below:
+    strcpy(action[0].name, "Template Action");
     action[0].setActionPlayFunction(templatePlayFcn);
     action[0].setActionStopFunction(templateStopFcn);
 
@@ -47,11 +48,6 @@ int templatePlayFcn(uint8_t number)
   // that may be needed for the execution of the action sequence.
   // The current value of userState, userVar1 and userVar2 is displayed on the 
   //action configuration page in the web interface for debugging purposes.
-  action[number].userState = 1;
-  action[number].userVar1 = 0;
-  action[number].userVar2++;
-
-
 
   switch(action[number].userState)
   {
@@ -62,14 +58,14 @@ int templatePlayFcn(uint8_t number)
       localDebug.println("Step 1 of action sequence for action number: " + String(number));
       // Set userState to the next state and return the required delay time in milliseconds before the next step is executed
       action[number].userState = 2;
-      return(1000); // wait for 1 second before executing the next step
+      return(10000); // wait for 10 seconds before executing the next step
 
     case 2:
       // Perform the second step of the action sequence
       localDebug.println("Step 2 of action sequence for action number: " + String(number));
       // Set userState to the next state and return the required delay time in milliseconds before the next step is executed
       action[number].userState = 3;
-      return(2000); // wait for 2 seconds before executing the next step
+      return(20000); // wait for 20 seconds before executing the next step
 
     case 3:
       // Perform the third step of the action sequence

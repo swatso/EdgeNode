@@ -1,6 +1,7 @@
 #include "system.h"
 #include <Arduino.h>
 #include "gpio.h"
+#include "action.h"
 
 void setupSystem()
 {
@@ -36,6 +37,22 @@ void getSystemInfo()
     vCheckStackFreeSpace(gpioTask14);
     vCheckStackFreeSpace(gpioTask15);
     vCheckStackFreeSpace(servoSaverTask);
+    vCheckStackFreeSpace(actionTask0);
+    vCheckStackFreeSpace(actionTask1);
+    vCheckStackFreeSpace(actionTask2);
+    vCheckStackFreeSpace(actionTask3);
+    vCheckStackFreeSpace(actionTask4);
+    vCheckStackFreeSpace(actionTask5);
+    vCheckStackFreeSpace(actionTask6);
+    vCheckStackFreeSpace(actionTask7);
+    vCheckStackFreeSpace(actionTask8);
+    vCheckStackFreeSpace(actionTask9);
+    vCheckStackFreeSpace(actionTask10);
+    vCheckStackFreeSpace(actionTask11);
+    vCheckStackFreeSpace(actionTask12);
+    vCheckStackFreeSpace(actionTask13);
+    vCheckStackFreeSpace(actionTask14);
+    vCheckStackFreeSpace(actionTask15);
 }
 
 

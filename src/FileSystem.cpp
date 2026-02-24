@@ -46,8 +46,8 @@ char* readFileC(fs::FS &fs, const char *path, const char *deft)
     for(i=0; deft[i]>0x1F;i++)fileContent[i]=deft[i];
     fileContent[i]='\0';
 //Serial.println(fileContent);
-    writeFile(SPIFFS, path, fileContent);
     xSemaphoreGive(fsLock);
+    writeFile(SPIFFS, path, fileContent);
     return (&fileContent[0]);
   }
   // file is available, read it
@@ -87,9 +87,9 @@ String readFile(fs::FS &fs, const char *path, const char *deft)
   {
     Serial.print("- failed to open file for reading, creating file and restoring default:");
     Serial.println(deft);
-    writeFile(SPIFFS, path, deft);
     file.close();
     xSemaphoreGive(fsLock);
+    writeFile(SPIFFS, path, deft);
     return (deft);
   }
   String fileContent;
@@ -113,6 +113,7 @@ void writeFile(fs::FS &fs, const char * path, const char * message)
   File file = fs.open(path, FILE_WRITE);
   if(!file){
     Serial.println("- failed to open file for writing");
+    xSemaphoreGive(fsLock);
     return;
   }
   if(file.print(message))
@@ -167,8 +168,9 @@ void writeMP3ConfigFile(fs::FS &fs)
   file.println(mp3.currentVolume);
   file.println(mp3.manualTrim);
   file.println(mp3.autoTrim);
-  xSemaphoreGive(fsLock);
   file.close();
+  xSemaphoreGive(fsLock);
+
 }
 
 void readMP3ConfigFile(fs::FS &fs)
@@ -288,7 +290,6 @@ void readMP3TrackConfigFile(fs::FS &fs, uint8_t trackNo)
   Serial.println(mp3.track[trackNo].enableLocal);
   Serial.print("enableRemote: ");
   Serial.println(mp3.track[trackNo].enableRemote);
-
   file.close();
   xSemaphoreGive(fsLock);
 }

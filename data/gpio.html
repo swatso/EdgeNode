@@ -73,7 +73,7 @@ console.log("preset changed");
 console.log(this)
 				var bit = this.id.slice(-2);
 console.log("bit:"+bit);
-				if(type[bit] == 3)
+				if((type[bit] == 3)||(type[bit] == 4))
 				{
 					// Servo
 		    		if(this.value == 0)value = preset0[bit];

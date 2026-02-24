@@ -82,4 +82,21 @@ int defaultStopFcn(uint8_t number);
 
 extern edgeAction action[];
 
+extern TaskHandle_t actionTask0;
+extern TaskHandle_t actionTask1;
+extern TaskHandle_t actionTask2;
+extern TaskHandle_t actionTask3;
+extern TaskHandle_t actionTask4;
+extern TaskHandle_t actionTask5;
+extern TaskHandle_t actionTask6;
+extern TaskHandle_t actionTask7;
+extern TaskHandle_t actionTask8;
+extern TaskHandle_t actionTask9;
+extern TaskHandle_t actionTask10;
+extern TaskHandle_t actionTask11;
+extern TaskHandle_t actionTask12;
+extern TaskHandle_t actionTask13;
+extern TaskHandle_t actionTask14;
+extern TaskHandle_t actionTask15;
+
 #endif //ACTION_H

@@ -109,14 +109,15 @@
 
 			function showHelp(type) 
 			{
-				for(var i=0;i<8;i++)
+				for(var i=0;i<9;i++)
 				{
-					var ele1 = document.getElementById("type" + i + "1").style.display = 'none';  	// Preset 0 help
-					var ele2 = document.getElementById("type" + i + "2").style.display = 'none';	// Preset 1 help
-					var ele3 = document.getElementById("type" + i + "3").style.display = 'none';	// Preset 2 help
-					var ele4 = document.getElementById("type" + i + "4").style.display = 'none';	// Rate help
-					var ele5 = document.getElementById("type" + i + "5").style.display = 'none';	// Easing Type help
-					var ele8 = document.getElementById("type" + i + "8").style.display = 'none';	// Publish Rate help
+					document.getElementById("type" + i + "1").style.display = 'none';  	// Preset 0 help
+					document.getElementById("type" + i + "2").style.display = 'none';	// Preset 1 help
+					document.getElementById("type" + i + "3").style.display = 'none';	// Preset 2 help
+					document.getElementById("type" + i + "4").style.display = 'none';	// Rate help
+					document.getElementById("type" + i + "5").style.display = 'none';	// Easing Type help
+					document.getElementById("type" + i + "8").style.display = 'none';	// Publish Rate help
+					document.getElementById("ServoEasing").style.display = 'none';
 				}
 console.log("type:" + type);
 
@@ -125,7 +126,8 @@ console.log("type:" + type);
 				document.getElementById("type" + type + "3").style.display = 'block';			
 				document.getElementById("type" + type + "4").style.display = 'block';					
 				document.getElementById("type" + type + "5").style.display = 'block';	
-				document.getElementById("type" + type + "8").style.display = 'block';		
+				document.getElementById("type" + type + "8").style.display = 'block';
+				if((type == 3)||(type == 4))document.getElementById("ServoEasing").style.display = 'table-row';		
 			};
 
 		</script>
@@ -166,7 +168,7 @@ console.log("type:" + type);
 					<span id="type41" >Angle preset 0-180 deg</span>
 					<span id="type51" >Not Used</span>
 					<span id="type61" >Not Used</span>
-					<span id="type71" >Mark Period (mS)</span>
+					<span id="type71" >Not Used</span>
 					<span id="type81" >Mark Period (mS)</span>
 				</td>
 			</tr>
@@ -181,7 +183,7 @@ console.log("type:" + type);
 				<span id="type42">Angle preset 0-180 deg</span>
 				<span id="type52">Not Used</span>
 				<span id="type62">Not Used</span>
-				<span id="type72">OFF PWM frequency (0-255)</span>
+				<span id="type72">Not Used</span>
 				<span id="type82">OFF PWM frequency (0-255)</span>
 				</td>
 			</tr>
@@ -196,7 +198,7 @@ console.log("type:" + type);
 					<span id="type43">Angle preset 0-180 deg</span>	
 					<span id="type53">Not Used</span>
 					<span id="type63">Not Used</span>
-					<span id="type73">ON PWM frequency (0-255)</span>
+					<span id="type73">Not Used</span>
 					<span id="type83">ON PWM frequency (0-255)</span>				
 				</td>
 			</tr>

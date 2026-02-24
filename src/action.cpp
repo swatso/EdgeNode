@@ -46,22 +46,22 @@ void setupAction()
   for(uint8_t i=0; i<MAX_ACTIONS; i++)action[i].number = i;
 
   // Create helper tasks for each action (animation sequence)
-  xTaskCreatePinnedToCore(aHelper0, "ACTION0", 2000, NULL, 1, &actionTask0, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper1, "ACTION1", 2000, NULL, 1, &actionTask1, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper2, "ACTION2", 2000, NULL, 1, &actionTask2, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper3, "ACTION3", 2000, NULL, 1, &actionTask3, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper4, "ACTION4", 2000, NULL, 1, &actionTask4, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper5, "ACTION5", 2000, NULL, 1, &actionTask5, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper6, "ACTION6", 2000, NULL, 1, &actionTask6, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper7, "ACTION7", 2000, NULL, 1, &actionTask7 ,0); // Core 0
-  xTaskCreatePinnedToCore(aHelper8, "ACTION8", 2000, NULL, 1, &actionTask8, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper9, "ACTION9", 2000, NULL, 1, &actionTask9, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper10, "ACTION10", 2000, NULL, 1, &actionTask10, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper11, "ACTION11", 2000, NULL, 1, &actionTask11, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper12, "ACTION12", 2000, NULL, 1, &actionTask12, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper13, "ACTION13", 2000, NULL, 1, &actionTask13 ,0);	// Core 0 
-  xTaskCreatePinnedToCore(aHelper14, "ACTION14", 2000, NULL, 1, &actionTask14 ,0); // Core 0
-  xTaskCreatePinnedToCore(aHelper15, "ACTION15", 2000, NULL, 1, &actionTask15 ,0);	// Core 0
+  xTaskCreatePinnedToCore(aHelper0, "ACTION0", 3000, NULL, 1, &actionTask0, 0); // Core 0
+  xTaskCreatePinnedToCore(aHelper1, "ACTION1", 3000, NULL, 1, &actionTask1, 0); // Core 0
+  xTaskCreatePinnedToCore(aHelper2, "ACTION2", 3000, NULL, 1, &actionTask2, 0); // Core 0
+  xTaskCreatePinnedToCore(aHelper3, "ACTION3", 3000, NULL, 1, &actionTask3, 0); // Core 0
+  xTaskCreatePinnedToCore(aHelper4, "ACTION4", 3000, NULL, 1, &actionTask4, 0); // Core 0
+  xTaskCreatePinnedToCore(aHelper5, "ACTION5", 3000, NULL, 1, &actionTask5, 0); // Core 0
+  xTaskCreatePinnedToCore(aHelper6, "ACTION6", 3000, NULL, 1, &actionTask6, 0); // Core 0
+  xTaskCreatePinnedToCore(aHelper7, "ACTION7", 3000, NULL, 1, &actionTask7 ,0); // Core 0
+  xTaskCreatePinnedToCore(aHelper8, "ACTION8", 3000, NULL, 1, &actionTask8, 0); // Core 0
+  xTaskCreatePinnedToCore(aHelper9, "ACTION9", 3000, NULL, 1, &actionTask9, 0); // Core 0
+  xTaskCreatePinnedToCore(aHelper10, "ACTION10", 3000, NULL, 1, &actionTask10, 0); // Core 0
+  xTaskCreatePinnedToCore(aHelper11, "ACTION11", 3000, NULL, 1, &actionTask11, 0); // Core 0
+  xTaskCreatePinnedToCore(aHelper12, "ACTION12", 3000, NULL, 1, &actionTask12, 0); // Core 0
+  xTaskCreatePinnedToCore(aHelper13, "ACTION13", 3000, NULL, 1, &actionTask13 ,0);	// Core 0 
+  xTaskCreatePinnedToCore(aHelper14, "ACTION14", 3000, NULL, 1, &actionTask14 ,0); // Core 0
+  xTaskCreatePinnedToCore(aHelper15, "ACTION15", 3000, NULL, 1, &actionTask15 ,0);	// Core 0
 
 
 }
