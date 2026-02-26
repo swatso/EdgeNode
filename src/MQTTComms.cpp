@@ -140,8 +140,11 @@ boolean  subscribeTopics()
   for(i=0; i<17; i++)
   {
     // We are subscribing to action topics 00 to 0F hex
-    actionTopic[18]= i + 0x30;
-    if(actionTopic[18] > 57)actionTopic[18]+=7;
+    actionTopic[17]= i + 0x30;
+    if(actionTopic[17] > 57)actionTopic[17]+=7;
+
+    Serial.print("Subscribing to:");
+    Serial.println(actionTopic);
     client.subscribe(actionTopic);
     serviceConnection();
     yield();
@@ -180,8 +183,8 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
   // Called when one of the subscribed topics is recieved
   // ie a Turnout has changed in value...
   // Event will be defined by topic[17] and topic[18] in the range 00 to 0F hex
-  byte event = (topic[18]-0x30);
-  if (event > 9)event -= 7;
+  byte event;
+
 
   Serial.print("(MQTTcallback) topic:");
   Serial.println(topic);
@@ -189,6 +192,8 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
   if (strncmp(topic, turnoutTopic, 14) == 0) 
   {
     // This is a Turnout topic
+    event = (topic[18]-0x30);
+    if (event > 9)event -= 7;
     Serial.print("(MQTTcallback) Turnout event:");
     Serial.println(event);
     if(gpio[event].type == GPIO_SERVO_ACTUATOR)
@@ -214,6 +219,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
   }
   if (strncmp(topic, soundAutoTrimTopic, 21) == 0) 
   {
+    Serial.print("(MQTTcallback) Sound AutoTrim event");
     // True or Thrown paylaod will apply autoTrim volume adjustment
     if ((char)payload[0] == 'T')mp3.autoTrimEnabled=true;
     else mp3.autoTrimEnabled=false;
@@ -222,8 +228,10 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
   else if (strncmp(topic, soundTopic, 12) == 0) 
   {
     // This is a Sound topic
-    Serial.print("(MQTTcallback) Sound event:");
-    Serial.println(event);
+    event = (topic[16]-0x30);
+    if (event > 9)event -= 7;
+//    Serial.print("(MQTTcallback) Sound event:");
+//    Serial.println(event);
     if ((char)payload[0] == 'P')mp3.play(CMD_REMOTE,event,false);
     else if ((char)payload[0] == 'L')mp3.play(CMD_REMOTE,event,true);
     else mp3.stop(CMD_REMOTE);
@@ -233,13 +241,15 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
     // This is an Action topic
     // Payload is
     // P for play, L for Loop (play with repeat), S for stop
-    Serial.print("(MQTTcallback) Action event:");
-    Serial.println(event);
+    event = (topic[17]-0x30);
+    if (event > 9)event -= 7;
+//    Serial.print("(MQTTcallback) Action event:");
+//    Serial.println(event);
     if ((char)payload[0] == 'P')action[event].play(CMD_REMOTE,false);
     else if ((char)payload[0] == 'L')action[event].play(CMD_REMOTE,true);
     else if ((char)payload[0] == 'S')action[event].stop(CMD_REMOTE);
   }
-  Serial.println(event);
+//  Serial.println(event);
 }
 
 // Receiver task: waits for gpio sensor data from the queue and publishes it

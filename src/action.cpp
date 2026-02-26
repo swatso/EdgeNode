@@ -257,16 +257,6 @@ void edgeAction::setActionStopFunction(int (*fp)(uint8_t number))
   fpStop = fp;
 }
 
-void edgeAction::pause(long mS)
-{
-  // This function creates a delay in the execution of the action sequence. 
-  // It is used to create timing between events in the action sequence. 
-  //The delay is implemented using vTaskDelay, which allows other tasks to run while the action is paused.
-
-  vTaskDelay(mS / portTICK_PERIOD_MS);
-  return;
-}
-
 int defaultPlayFcn(uint8_t number)
 {
   //Serial.print("defaultPlayFunction for action:"); Serial.println(number);
@@ -279,7 +269,6 @@ int defaultPlayFcn(uint8_t number)
   action[number].userState = 1;
   action[number].userVar1 = 0;
   action[number].userVar2++;
-  action[number].pause(1000); // example of using the pause function to create a delay in the action sequence
   return(0);                       // return the delay time in milliseconds until the next state transition in the action sequence. 
                                       // If the action sequence has finished, return 0 to indicate that there are no more state transitions and the action can be set to idle.
 }

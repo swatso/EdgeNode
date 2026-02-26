@@ -22,6 +22,7 @@
 #include "debugStream.h"
 #include "gpio.h"
 #include "action.h"
+#include "sound.h"
 
 void setupUserCode() 
 {
@@ -35,9 +36,50 @@ void setupUserCode()
     gpio[0].preset1 = 20;    // Off PWM setting (0 to 255) (applies to GPIO_PWM_PULSE)
     gpio[0].preset2 = 200;   // On PWM setting (0 to 255) (applies to GPIO_PWM_PULSE)
     gpio[0].rate = 1000;     // Overall pulse cycle in mS (applies to GPIO_PWM_PULSE)
-
-    // more GPIO configuration can be added here as needed for the action sequences
     // ...
+
+    // hardcode sound configuration here
+    strcpy(mp3.track[0].name, "Ambient");
+    mp3.track[0].duration = 50000;        // duration of track 0 in mS
+    mp3.track[0].volume = 10;            // volume for track 0 (0 to 30)
+
+    strcpy(mp3.track[1].name, "Ambient");
+    mp3.track[1].duration = 78000;    // duration of track 1 in mS - Ambient
+    mp3.track[1].volume = 5;        // volume for track 1 (0 to 30)
+
+    strcpy(mp3.track[2].name, "Ambient2");
+    mp3.track[2].duration = 77000;    // duration of track 2 in mS - Ambient
+    mp3.track[2].volume = 3;        // volume for track 2 (0 to 30)
+
+    strcpy(mp3.track[3].name, "Children Playing");
+    mp3.track[3].duration = 72000;    // duration of track 3 in mS - Children playing
+    mp3.track[3].volume = 10;        // volume for track 3 (0 to 30)
+
+    strcpy(mp3.track[4].name, "Siren");
+    mp3.track[4].duration = 4000;    // duration of track 4 in mS - Siren
+    mp3.track[4].volume = 10;        // volume for track 4 (0 to 30)
+
+    strcpy(mp3.track[5].name, "Train Bell");
+    mp3.track[5].duration = 9000;    // duration of track 5 in mS - Train Bell
+    mp3.track[5].volume = 10;        // volume for track 5 (0 to 30)
+
+    strcpy(mp3.track[6].name, "Siren Low");
+    mp3.track[6].duration = 19000;    // duration of track 6 in mS - Siren Low
+    mp3.track[6].volume = 10;        // volume for track 6 (0 to 30)
+    strcpy(mp3.track[7].name, "Whistle");
+    mp3.track[7].duration = 1000;    // duration of track 7 in mS - Whistle
+    mp3.track[7].volume = 10;        // volume for track 7 (0 to 30)
+
+    strcpy(mp3.track[8].name, "Whistle Long");
+    mp3.track[8].duration = 3000;    // duration of track 8 in mS  - Whistle
+    mp3.track[8].volume = 10;        // volume for track 8 (0 to 30)
+    
+    strcpy(mp3.track[9].name, "Horn Short");
+    mp3.track[9].duration = 1000;    // duration of track 9 in mS - Horn
+    mp3.track[9].volume = 10;        // volume for track 9 (0 to 30)
+    // ...  
+
+
 
 
     // define an example action with the template play and stop functions defined below. You can define up to 16 actions (numbered 0-15) with their own play and stop functions.
@@ -111,6 +153,7 @@ int templatePlayFcn(uint8_t number)
       localDebug.println("Step 2 of action sequence for action number: " + String(number));
       // Set userState to the next state and return the required delay time in milliseconds before the next step is executed
       gpio[0].rate = 500;     // change the pulse cycle to 500 mS (applies to GPIO_PWM_PULSE)
+      mp3.play(CMD_LOCAL,5,false); // play sound track 5
       action[number].userState = 3;
       return(20000); // wait for 20 seconds before executing the next step
 

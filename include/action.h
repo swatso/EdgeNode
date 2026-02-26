@@ -48,7 +48,6 @@ class edgeAction
     int userState; // this variable can be used by the user defined play and stop functions to keep track of the state
     int userVar1;  
     int userVar2; // this variable can be used by the user defined play and stop functions to keep track of a variable (e.g. current track number)
-    void pause(long mS);
     void helper();                  // This is essentially private to the class but is called by the external helper task
                                     // FreeRtos does not allow this function to be instantiated as a task directly
   private:

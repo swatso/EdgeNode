@@ -165,7 +165,7 @@ void setupWiFi()
 {
   if(initWiFi()) 
   {
-    Serial.println("initialising web server");
+//    Serial.println("initialising web server");
     server.serveStatic("/", SPIFFS, "/");
     
     // Route for /home web page
@@ -226,7 +226,7 @@ void setupWiFi()
     // Route for /favicon
     server.on("/favicon", HTTP_GET, [](AsyncWebServerRequest *request) {
       Serial.println("Serve favicon.png");
-      request->send(SPIFFS, "/favicon.png", "image/png", false);
+      request->send(SPIFFS, "/Favicon.png", "image/png", false);
     });
 
     //======== Server REST WebAPI Endpoints ===============================//
@@ -317,9 +317,15 @@ void setupWiFi()
       {
         int trackNo;
         char* ptr;
-        Serial.println("Received /api/soundTrack/status GET request");
+//        Serial.println("Received /api/soundTrack/status GET request");
         if (request->hasParam("trackno")) trackNo = strtol(request->getParam("trackno")->value().c_str(),&ptr,10);
         else trackNo = 0;
+
+//        Serial.print("TrackNo:");
+//        Serial.println(trackNo);
+//        Serial.print("Track Name:");
+//        Serial.println(mp3.track[trackNo].name);
+
         AsyncResponseStream *response = request->beginResponseStream("application/json");
         JsonDocument doc;
         doc["name"] = mp3.track[trackNo].name;
@@ -379,8 +385,8 @@ void setupWiFi()
         doc["preset1"] = gpio[bit].preset1;
         doc["preset2"] = gpio[bit].preset2;
         doc["rate"] = gpio[bit].rate;
-Serial.print("getConfigWEBenpoint  enableRemote: ");
-Serial.println(gpio[bit].enableRemote);
+//Serial.print("getConfigWEBenpoint  enableRemote: ");
+//Serial.println(gpio[bit].enableRemote);
         doc["enableRemote"] = gpio[bit].enableRemote;
         doc["enableLocal"] = gpio[bit].enableLocal;
         doc["publishRate"] = gpio[bit].getPublishRate();
@@ -561,11 +567,11 @@ Serial.println((int) doc["value"]);
           }
           else
           {
-            Serial.print("action: ");
+//            Serial.print("action: ");
             int number = (int) doc["number"];
             bool loop = doc["loop"];
             if((number >= 0)&&(number<16))action[number].play(CMD_ANY,loop);             
-            Serial.println(number);
+//            Serial.println(number);
           }
       }
 
@@ -579,10 +585,10 @@ Serial.println((int) doc["value"]);
           }
           else
           {
-            Serial.print("action: ");
+            //Serial.print("action: ");
             int number = (int) doc["number"];
             if((number >= 0)&&(number<16))action[number].stop(CMD_ANY);             
-            Serial.println(number);
+            //Serial.println(number);
           }
       }
 
@@ -596,11 +602,11 @@ Serial.println((int) doc["value"]);
           }
           else
           {
-            Serial.print("track: ");
+//            Serial.print("track: ");
             int track = (int) doc["track"];
             bool loop = doc["loop"];
             if((track >= 0)&&(track<16))mp3.play(CMD_ANY,track,loop);             
-            Serial.println(track);
+//            Serial.println(track);
           }
       }
 
@@ -614,15 +620,15 @@ Serial.println((int) doc["value"]);
           }
           else
           {
-            Serial.print("track: ");
+            //Serial.print("track: ");
             int track = (int) doc["track"];
             mp3.stop(CMD_ANY);
             if((track >= 0)&&(track<16))mp3.stop(CMD_ANY);             
-            Serial.println(track);
+            //Serial.println(track);
           }
       }
 
-      Serial.println("200");
+      //Serial.println("200");
       request->send(200,"application/json","OK");
     });      
     server.begin();

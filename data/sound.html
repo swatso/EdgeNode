@@ -28,7 +28,7 @@ console.log("init");
 
 				for(var i=0;i<16;i++)
 				{
-					getSoundTrackStatus(i);
+					await getSoundTrackStatus(i);
 				}
 				const mp3Demands = document.querySelectorAll('input[id="manualTrimInput"], input[id="autoTrimInput"]');
 				mp3Demands.forEach(demand => {demand.addEventListener('change', trimChanged);});
@@ -73,9 +73,7 @@ console.log("getMP3PlayerStatus");
 
 			async function getSoundTrackStatus(trackNo) 
 			{
-console.log("getSoundTrackStatus" + trackNo);
-
-			  var response = await fetch("//"+window.location.host+"/api/soundTrack/status?track="+trackNo);
+			  var response = await fetch("//"+window.location.host+"/api/soundTrack/status?trackno="+trackNo);
 			  var data = await response.json();
 			  var resp = JSON.parse(JSON.stringify(data));
         	  var ele = document.getElementById('name'+trackNo);

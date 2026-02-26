@@ -144,8 +144,6 @@ bool  GPIOState()
 bool run1Switch()
 {
   // Returns true if the RUN1 switch is closed (connected to GND)
-  Serial.print("Run1 switch state:");
-  Serial.println(digitalRead(RUN1));
   return digitalRead(RUN1) == LOW;
 }
 

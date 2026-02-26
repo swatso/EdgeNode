@@ -1,12 +1,6 @@
-void testPWMLocalReadWrite();                               
-void testPWMRemoteReadWrite();                              
-void testDOUTLocalReadWrite();                              
-void testDOUTRemoteReadWrite();                             
-void testDINLocalRead();                                    
-void testDINRemoteRead();                                   
-void testAINLocalRead();                                    
-void testAINRemoteRead();                                   
-void testServoLocalReadWrite();                             
-void testServoRemoteReadWrite();                            
-void multiServoTest();                                      
+#ifndef MAIN_H
+#define MAIN_H 
+
 void pause(long mS);
+
+#endif // MAIN_H
