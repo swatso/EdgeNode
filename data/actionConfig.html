@@ -49,9 +49,11 @@ console.log("getActionConfig" + number);
 			  var response = await fetch("//"+window.location.host+"/api/action/config?number="+number);
 			  var data = await response.json();
 			  var resp = JSON.parse(JSON.stringify(data));
-
+			  name = resp.name;
 			  ele = document.getElementById('currentAction');	
 	  		  ele.innerText = "Action:" + resp.number;
+			  ele = document.getElementById('name');	
+	  		  ele.innerText = "Name:" + resp.name;
 			  ele = document.getElementById('state');	
 	  		  ele.innerText = "state:" + stateToText(resp.state);
 			  ele = document.getElementById('userState');
@@ -73,6 +75,7 @@ console.log("getActionConfig" + number);
 			   var enableLocal = document.getElementById('enableLocal');
   			   var url = "//"+window.location.host+"/api/action/config";
                var out = '{"number":' + number + ',';
+			   out = out + '"name":"' + name + '",';
                out = out + '"enableRemote":' + enableRemote.checked + ',';
                out = out + '"enableLocal":' + enableLocal.checked + ' }';
  			   postit(url,out);
@@ -131,7 +134,7 @@ console.log("getActionConfig" + number);
 			<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>
 			<tr>
 				<td width="17%"><span id="currentAction">-Loading</span></td>
-				<td width="17%"><span id="repeat"></span></td>
+				<td width="17%"><span id="name"></span></td>
 				<td width="17%"><span id="state"></span></td>
 				<td width="15%"><span id="userState"></span></td>
 				<td width="17%"><span id="userVar1"></span></td>

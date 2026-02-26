@@ -7,5 +7,6 @@
 void setupUserCode();
 int templatePlayFcn(uint8_t number);
 int templateStopFcn(uint8_t number);
+int runSwitchHandler(uint8_t number);
 
 #endif // USERCODE_H

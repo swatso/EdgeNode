@@ -50,6 +50,8 @@ console.log("getActionConfig" + number);
 			  var data = await response.json();
 			  var resp = JSON.parse(JSON.stringify(data));
 console.log(resp);
+			  document.getElementById('name'+number).innerText = resp.name;
+			  name[number] = resp.name;
 			  ele = document.getElementById('enableRemote'+number);	
 	  		  ele.checked = resp.enableRemote;
 			  ele = document.getElementById('enableLocal'+number);	
@@ -62,6 +64,7 @@ console.log(resp);
 			   var enableLocal = document.getElementById('enableLocal'+number);
   			   var url = "//"+window.location.host+"/api/action/config";
                var out = '{"number":' + number + ',';
+			   out = out + '"name":"' + name[number] + '",';
                out = out + '"enableRemote":' + enableRemote.checked + ',';
                out = out + '"enableLocal":' + enableLocal.checked + ' }';
  			   postit(url,out);
@@ -116,7 +119,7 @@ console.log(resp);
 			<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>
 			<tr>
 				<td width="17%">Action:00</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name0"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
@@ -144,7 +147,7 @@ console.log(resp);
 			</tr>
 				<tr>
 				<td width="17%">Action:01</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name1"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
@@ -174,7 +177,7 @@ console.log(resp);
 			</tr>
 				<tr>
 				<td width="17%">Action:02</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name2"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
@@ -204,7 +207,7 @@ console.log(resp);
 			</tr>
 				<tr>
 				<td width="17%">Action:03</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name3"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
@@ -234,7 +237,7 @@ console.log(resp);
 			</tr>
 				<tr>
 				<td width="17%">Action:04</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name4"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
@@ -264,7 +267,7 @@ console.log(resp);
 			</tr>
 				<tr>
 				<td width="17%">Action:05</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name5"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
@@ -294,7 +297,7 @@ console.log(resp);
 			</tr>
 				<tr>
 				<td width="17%">Action:06</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name6"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
@@ -324,7 +327,7 @@ console.log(resp);
 			</tr>
 				<tr>
 				<td width="17%">Action:07</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name7"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
@@ -354,7 +357,7 @@ console.log(resp);
 			</tr>
 				<tr>
 				<td width="17%">Action:08</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name8"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
@@ -384,7 +387,7 @@ console.log(resp);
 			</tr>
 				<tr>
 				<td width="17%">Action:09</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name9"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
@@ -414,7 +417,7 @@ console.log(resp);
 			</tr>
 				<tr>
 				<td width="17%">Action:0A</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name10"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
@@ -444,7 +447,7 @@ console.log(resp);
 			</tr>
 				<tr>
 				<td width="17%">Action:0B</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name11"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
@@ -474,7 +477,7 @@ console.log(resp);
 						</tr>
 				<tr>
 				<td width="17%">Action:0C</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name12"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
@@ -504,7 +507,7 @@ console.log(resp);
 			</tr>
 				<tr>
 				<td width="17%">Action:0D</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name13"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
@@ -534,7 +537,7 @@ console.log(resp);
 			</tr>
 				<tr>
 				<td width="17%">Action:0E</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name14"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
@@ -564,7 +567,7 @@ console.log(resp);
 			</tr>
 				<tr>
 				<td width="17%">Action:0F</td>
-				<td width="17%"><p  ></p></td>
+				<td width="17%"><p id="name15"></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>
 				<td width="17%"><p  ></p></td>

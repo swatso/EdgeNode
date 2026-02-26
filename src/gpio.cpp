@@ -48,10 +48,6 @@ TaskHandle_t servoSaverTask;
 gpioPin gpio[16];                // Create an array of GPIO Classes which can be indexed [0] to [15] to control GPIO
 
 
-//#define debugGPIO
-
-	//-- moved to arduinoGlue.h // #define POWER_GPIO 2
-
 void  setupGPIO()
 {
   // Call this early at startup -before loading the I/O configuration,  to instantiate objects and initialise the control structures
@@ -100,7 +96,9 @@ void  setupGPIO()
   {
     readConfigFile(SPIFFS,bit);
   }
-
+  pinMode(RUN1,INPUT_PULLUP);
+  pinMode(RUN2,INPUT_PULLUP);
+  pinMode(POWER_GPIO,OUTPUT);
   analogReadResolution(12);       // set the resolution to 12 bits (0-4096)
 
     // Create servo queue
@@ -137,10 +135,24 @@ pinMode(POWER_GPIO,OUTPUT);
 digitalWrite(POWER_GPIO, powerUp);
 }
 
-bool  GPIOstate()
+bool  GPIOState()
 {
   // Returns true if th GPIO system is running (pwered up)
   return digitalRead(POWER_GPIO);
+}
+
+bool run1Switch()
+{
+  // Returns true if the RUN1 switch is closed (connected to GND)
+  Serial.print("Run1 switch state:");
+  Serial.println(digitalRead(RUN1));
+  return digitalRead(RUN1) == LOW;
+}
+
+bool run2Switch()
+{
+  // Returns true if the RUN2 switch is closed (connected to GND)
+  return digitalRead(RUN2) == LOW;
 }
 
 void loadServoPositions()
@@ -680,7 +692,7 @@ void servoSaver(void * pvParameters)
         vTaskDelay(100 / portTICK_PERIOD_MS);
       }
       // Save the position to SPIFFS
-      if(GPIOstate() == true)
+      if(GPIOState() == true)
       {
         // Check if servo is still at the same position before saving (ie it has not been moved again since we queued the save)
         if(gpio[receivedServo.bitNo].getValue() == receivedServo.position)
@@ -695,7 +707,7 @@ void servoSaver(void * pvParameters)
 
 void gpioPin::publish(uint8_t bit, int aValue)
 {
-  if(GPIOstate() == true)   // only publish if power to the GPIOs is on
+  if(GPIOState() == true)   // only publish if power to the GPIOs is on
   {
     Serial.println("Publishing GPIO change");
     MQTTSensor payload;

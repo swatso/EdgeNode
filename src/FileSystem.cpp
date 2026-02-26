@@ -1,14 +1,13 @@
 
 // Collection of functions which allow access to the SPIFFS file system
 #include "FileSystem.h"
-//#include "SPIFFS.h"
 #include <SPIFFS.h>                               	
-#include "arduinoGlue.h"
 #include "gpio.h"
 #include "action.h"
 
-// File paths to save input values permanently
+#define HASH 35
 
+// File paths to save input values permanently
 const char* quietOffsetPath = "/quietOffset.txt";
 const char* loudOffsetPath = "/loudOffset.txt";
 const char* nodeConfigPath = "/config#.txt";
@@ -406,6 +405,7 @@ void writeActionConfigFile(fs::FS &fs, uint8_t number)
     xSemaphoreGive(fsLock);
     return;
   }
+  file.println(action[number].name);
   file.println(action[number].number);
   file.println(action[number].enableLocal);
   file.println(action[number].enableRemote);
@@ -448,6 +448,11 @@ void readActionConfigFile(fs::FS &fs, uint8_t number)
     xSemaphoreGive(fsLock);
     return;
   }
+  char buffer[20];
+  file.readBytesUntil('\n',buffer,sizeof(buffer));
+  buffer[strlen(buffer)-1]='\0';
+  for(i=0; (buffer[i] != '\0')&& (i<19); i++)action[number].name[i] = buffer[i];
+  action[number].name[i]='\0';
   action[number].number = std::stoi(readConfigItem(file),NULL,10);
   action[number].enableLocal = std::stoi(readConfigItem(file),NULL,10);
   action[number].enableRemote = std::stoi(readConfigItem(file),NULL,10);

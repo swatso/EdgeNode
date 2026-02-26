@@ -78,7 +78,7 @@
             messagePayload.topic[sizeof(messagePayload.topic) - 1] = '\0';
             strncpy(messagePayload.message, payload, sizeof(messagePayload.message) - 1);
             messagePayload.message[sizeof(messagePayload.message) - 1] = '\0';
-            if(GPIOstate() == true)MQTTPublishMessage(messagePayload);  // publish the message to MQTT
+            if(GPIOState() == true)MQTTPublishMessage(messagePayload);  // publish the message to MQTT
         }
         return written;
     }

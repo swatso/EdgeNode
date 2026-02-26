@@ -8,5 +8,8 @@ unsigned long WiFiGetCommsUptime();
 String WiFiGetIPAddress();                                      
 String WiFiGetSSID();                                           
 int WiFiGetRSSI(); 
+void setupWiFi(); 
+bool initWiFi();                                            
+void checkWiFiConnection();
 
 #endif // WIFIMANAGER_H

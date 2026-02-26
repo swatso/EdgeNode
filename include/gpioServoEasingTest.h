@@ -8,7 +8,5 @@
 #include "NodeServices.h"
 #include "WiFiManager.h"
 
-#include "arduinoGlue.h"
-
 //============ Added by Convertor ==========
 #endif // GPIOSERVOEASINGTEST_H

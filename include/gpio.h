@@ -35,6 +35,9 @@ bool GPIOstate();
 #define GPIO_BIT0D 22
 #define GPIO_BIT0E 23
 #define GPIO_BIT0F 33
+#define RUN1       36          
+#define RUN2       39
+#define POWER_GPIO 2
 
 // define I/O types
 #define GPIO_NONE   0
@@ -148,6 +151,9 @@ void helper14(void * pvParameters);
 void helper15(void * pvParameters); 
 void servoSaver(void * pvParameters);
 
+bool run1Switch();
+bool run2Switch();
+bool GPIOState();
 extern gpioPin         gpio[]; 
 
 #endif //GPIO_H

@@ -20,17 +20,61 @@
 
 #include "UserCode.h"
 #include "debugStream.h"
+#include "gpio.h"
+#include "action.h"
 
 void setupUserCode() 
 {
     // User code setup
-    // This function is called at the end of setup() in main.cpp and can be used to perform any user defined setup required for the action sequences, such as configuring GPIOs, initializing sensors, etc.
+    // This function is called during setup() in main.cpp and can be used to perform any user defined setup required for the action sequences, such as configuring GPIOs, initializing sensors, etc.
     // For example, to set the play and stop functions for Action 0 to the template functions defined below:
+
+    // hardcode GPIO types here
+    gpio[0].setType(GPIO_PWM_PULSE); // Set GPIO 0 to PWM mode (for example purposes, you can change this to any other type and GPIO as needed)
+    gpio[0].preset0 = 250;    // Mark Period in mS (applies to GPIO_PWM_PULSE)
+    gpio[0].preset1 = 20;    // Off PWM setting (0 to 255) (applies to GPIO_PWM_PULSE)
+    gpio[0].preset2 = 200;   // On PWM setting (0 to 255) (applies to GPIO_PWM_PULSE)
+    gpio[0].rate = 1000;     // Overall pulse cycle in mS (applies to GPIO_PWM_PULSE)
+
+    // more GPIO configuration can be added here as needed for the action sequences
+    // ...
+
+
+    // define an example action with the template play and stop functions defined below. You can define up to 16 actions (numbered 0-15) with their own play and stop functions.
     strcpy(action[0].name, "Template Action");
     action[0].setActionPlayFunction(templatePlayFcn);
     action[0].setActionStopFunction(templateStopFcn);
 
+    // define an example action to monitor RUN1 switch with the runSwitchHandler function defined below. This action will be scheduled to run every 500 mS to check the state of the RUN1 switch and start/stop the action sequence for action 0 based on the state of the switch.
+    strcpy(action[15].name, "RUN1 switch Action");
+    action[15].setActionPlayFunction(runSwitchHandler);
+    action[15].play(CMD_LOCAL, true); // start the action to monitor the RUN1 switch (this will call the runSwitchHandler function every 500 mS to check the state of the switch and start/stop the action sequence for action 0 accordingly)
     localDebug.println("User code setup completed");
+}
+
+int runSwitchHandler(uint8_t number)
+{
+  // This function will be scheduled as action15 to check the state of the run1 switch
+  switch(action[number].userState)
+  {
+    case 1:
+      if(run1Switch())
+      {
+        localDebug.println("Run1 switch is ON, starting action sequence for action number: 0");
+        action[0].play(CMD_LOCAL, true); // start the action sequence for action 0 (this will call the play function for action 0 to execute the first step in the sequence)
+        action[number].userState = 2;
+      }
+      break;
+    case 2:
+      if(run1Switch()==false)
+      {
+        localDebug.println("Run1 switch is OFF, stopping action sequence for action number: 0");
+        action[0].stop(CMD_LOCAL); 
+        action[number].userState = 1;
+      }
+      break;
+    }
+    return(500); // check the switch states every 500 mS
 }
 
 
@@ -57,6 +101,8 @@ int templatePlayFcn(uint8_t number)
       localOperations.println("Executing action sequence for action number: " + String(number));
       localDebug.println("Step 1 of action sequence for action number: " + String(number));
       // Set userState to the next state and return the required delay time in milliseconds before the next step is executed
+      gpio[0].rate = 1000;     // change the pulse cycle to 1000 mS (applies to GPIO_PWM_PULSE)
+      gpio[0].localWrite(true); 
       action[number].userState = 2;
       return(10000); // wait for 10 seconds before executing the next step
 
@@ -64,6 +110,7 @@ int templatePlayFcn(uint8_t number)
       // Perform the second step of the action sequence
       localDebug.println("Step 2 of action sequence for action number: " + String(number));
       // Set userState to the next state and return the required delay time in milliseconds before the next step is executed
+      gpio[0].rate = 500;     // change the pulse cycle to 500 mS (applies to GPIO_PWM_PULSE)
       action[number].userState = 3;
       return(20000); // wait for 20 seconds before executing the next step
 
@@ -71,6 +118,7 @@ int templatePlayFcn(uint8_t number)
       // Perform the third step of the action sequence
       localOperations.println("Step 3 of action sequence for action number: " + String(number));
       // Set userState to 0 to indicate that the sequence is completed and return 0 to indicate that no further steps are required
+      gpio[0].localWrite(false);
       return(0); // no further steps required
 
     default:
@@ -91,5 +139,7 @@ int templateStopFcn(uint8_t number)
   // The current value of userState, userVar1 and userVar2 is displayed on the 
   //action configuration page in the web interface for debugging purposes.
   localOperations.println("Stopping action sequence for action number: " + String(number));
+  gpio[0].localWrite(false);
+  action[number].stop(CMD_LOCAL);
   return(0);
 }

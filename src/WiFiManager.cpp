@@ -13,16 +13,15 @@
 #include "sound.h"
 #include "action.h"
 
-//#include <cstring>
-#include <Arduino.h>                              		//-- moved to arduinoGlue.h
-#include <WiFi.h>                                 		//-- moved to arduinoGlue.h
-#include <ESPAsyncWebServer.h>                    		//-- moved to arduinoGlue.h
-#include <AsyncTCP.h>                             		//-- moved to arduinoGlue.h
-#include <ESPmDNS.h>                              		//-- moved to arduinoGlue.h
-#include <ArduinoJson.h>                          		//-- moved to arduinoGlue.h
-#include <AsyncJson.h>                            		//-- moved to arduinoGlue.h
-#include <WiFiUdp.h>                              		//-- moved to arduinoGlue.h
-#include <ArduinoOTA.h>                           		//-- moved to arduinoGlue.h
+#include <Arduino.h>                              		
+#include <WiFi.h>                                 		
+#include <ESPAsyncWebServer.h>                    		
+#include <AsyncTCP.h>                             		
+#include <ESPmDNS.h>                              		
+#include <ArduinoJson.h>                          		
+#include <AsyncJson.h>                            		
+#include <WiFiUdp.h>                              		
+#include <ArduinoOTA.h>                           		
 
 // Search for parameter in HTTP POST request when in access point mode
 
@@ -344,6 +343,7 @@ void setupWiFi()
         else number = 0;
         AsyncResponseStream *response = request->beginResponseStream("application/json");
         JsonDocument doc;
+        doc["name"] = action[number].name;
         doc["number"] = number;
         doc["enableLocal"] = action[number].enableLocal;
         doc["enableRemote"] = action[number].enableRemote;
@@ -509,6 +509,7 @@ Serial.println(gpio[bit].enableRemote);
             uint8_t number = (int) doc["number"];
             const char* buff;
             buff = doc["name"].as<const char*>();
+            strcpy(action[number].name,buff);
             action[number].enableRemote = doc["enableRemote"];
             action[number].enableLocal = doc["enableLocal"];
             writeActionConfigFile(SPIFFS,number);
