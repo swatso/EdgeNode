@@ -59,22 +59,7 @@ class edgeAction
 
 };
 
-void aHelper0(void * pvParameters); 
-void aHelper1(void * pvParameters);
-void aHelper2(void * pvParameters);
-void aHelper3(void * pvParameters);
-void aHelper4(void * pvParameters);
-void aHelper5(void * pvParameters);
-void aHelper6(void * pvParameters);
-void aHelper7(void * pvParameters);
-void aHelper8(void * pvParameters);
-void aHelper9(void * pvParameters);
-void aHelper10(void * pvParameters);
-void aHelper11(void * pvParameters);
-void aHelper12(void * pvParameters);
-void aHelper13(void * pvParameters);
-void aHelper14(void * pvParameters);
-void aHelper15(void * pvParameters);
+void actionHelperTask(void * pvParameters);
 
 int defaultPlayFcn(uint8_t number);
 int defaultStopFcn(uint8_t number);

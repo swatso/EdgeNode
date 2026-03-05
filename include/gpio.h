@@ -132,23 +132,8 @@ extern TaskHandle_t gpioTask14;
 extern TaskHandle_t gpioTask15;
 extern TaskHandle_t servoSaverTask;
 
-// Correspondingnhelper functions
-void helper0(void * pvParameters);                          
-void helper1(void * pvParameters);                          
-void helper2(void * pvParameters);                          
-void helper3(void * pvParameters);                          
-void helper4(void * pvParameters);                          
-void helper5(void * pvParameters);                          
-void helper6(void * pvParameters);                          
-void helper7(void * pvParameters);                          
-void helper8(void * pvParameters);                          
-void helper9(void * pvParameters);                          
-void helper10(void * pvParameters);                         
-void helper11(void * pvParameters);                         
-void helper12(void * pvParameters);                         
-void helper13(void * pvParameters);                         
-void helper14(void * pvParameters);                         
-void helper15(void * pvParameters); 
+// Corresponding helper function
+void gpioHelperTask(void * pvParameters);
 void servoSaver(void * pvParameters);
 
 bool run1Switch();

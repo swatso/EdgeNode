@@ -33,6 +33,13 @@ TaskHandle_t actionTask12;
 TaskHandle_t actionTask13;
 TaskHandle_t actionTask14;
 TaskHandle_t actionTask15;
+static uint8_t actionTaskIndex[MAX_ACTIONS];
+TaskHandle_t* actionTaskHandleRefs[MAX_ACTIONS] = {
+  &actionTask0, &actionTask1, &actionTask2, &actionTask3,
+  &actionTask4, &actionTask5, &actionTask6, &actionTask7,
+  &actionTask8, &actionTask9, &actionTask10, &actionTask11,
+  &actionTask12, &actionTask13, &actionTask14, &actionTask15
+};
 
 void loadActionConfig()
 {
@@ -47,136 +54,28 @@ void setupAction()
   for(uint8_t i=0; i<MAX_ACTIONS; i++)action[i].number = i;
 
   // Create helper tasks for each action (animation sequence)
-  xTaskCreatePinnedToCore(aHelper0, "ACTION0", 3000, NULL, 1, &actionTask0, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper1, "ACTION1", 3000, NULL, 1, &actionTask1, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper2, "ACTION2", 3000, NULL, 1, &actionTask2, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper3, "ACTION3", 3000, NULL, 1, &actionTask3, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper4, "ACTION4", 3000, NULL, 1, &actionTask4, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper5, "ACTION5", 3000, NULL, 1, &actionTask5, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper6, "ACTION6", 3000, NULL, 1, &actionTask6, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper7, "ACTION7", 3000, NULL, 1, &actionTask7 ,0); // Core 0
-  xTaskCreatePinnedToCore(aHelper8, "ACTION8", 3000, NULL, 1, &actionTask8, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper9, "ACTION9", 3000, NULL, 1, &actionTask9, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper10, "ACTION10", 3000, NULL, 1, &actionTask10, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper11, "ACTION11", 3000, NULL, 1, &actionTask11, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper12, "ACTION12", 3000, NULL, 1, &actionTask12, 0); // Core 0
-  xTaskCreatePinnedToCore(aHelper13, "ACTION13", 3000, NULL, 1, &actionTask13 ,0);	// Core 0 
-  xTaskCreatePinnedToCore(aHelper14, "ACTION14", 3000, NULL, 1, &actionTask14 ,0); // Core 0
-  xTaskCreatePinnedToCore(aHelper15, "ACTION15", 3000, NULL, 1, &actionTask15 ,0);	// Core 0
+  for(uint8_t i=0; i<MAX_ACTIONS; i++)
+  {
+    actionTaskIndex[i] = i;
+    char taskName[9];
+    snprintf(taskName, sizeof(taskName), "ACTION%u", i);
+    if (xTaskCreatePinnedToCore(actionHelperTask, taskName, 3000, &actionTaskIndex[i], 1, actionTaskHandleRefs[i], 0) != pdPASS)
+    {
+      Serial.printf("Failed to create ACTION%u\n", i);
+    }
+  }
 
 
 }
 
-void aHelper0(void * pvParameters)
+void actionHelperTask(void * pvParameters)
 {
-  // helper task for Action 0 sequence control
-  if(GPIOState()) action[0].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
-}
-
-void aHelper1(void * pvParameters)
-{
-  // helper task for Action 1 sequence control
-  if(GPIOState()) action[1].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
-}
-
-void aHelper2(void * pvParameters)
-{
-  // helper task for Action 2 sequence control
-  if(GPIOState()) action[2].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
-}
-
-void aHelper3(void * pvParameters)
-{
-  // helper task for Action 3 sequence control
-  if(GPIOState()) action[3].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
-}
-
-void aHelper4(void * pvParameters)
-{
-  // helper task for Action 4 sequence control
-  if(GPIOState()) action[4].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
-}
-
-void aHelper5(void * pvParameters)
-{
-  // helper task for Action 5 sequence control
-  if(GPIOState()) action[5].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
-}
-
-void aHelper6(void * pvParameters)
-{
-  // helper task for Action 6 sequence control
-  if(GPIOState()) action[6].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
-}
-
-void aHelper7(void * pvParameters)
-{
-  // helper task for Action 7 sequence control
-  if(GPIOState()) action[7].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
-}
-
-void aHelper8(void * pvParameters)
-{
-  // helper task for Action 8 sequence control
-  if(GPIOState()) action[8].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
-}
-
-void aHelper9(void * pvParameters)
-{
-  // helper task for Action 9 sequence control
-  if(GPIOState()) action[9].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
-}
-
-void aHelper10(void * pvParameters)
-{
-  // helper task for Action 10 sequence control
-  if(GPIOState()) action[10].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
-}
-
-void aHelper11(void * pvParameters)
-{
-  // helper task for Action 11 sequence control
-  if(GPIOState()) action[11].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
-}
-
-void aHelper12(void * pvParameters)
-{
-  // helper task for Action 12 sequence control
-  if(GPIOState())   action[12].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
-}
-
-void aHelper13(void * pvParameters)
-{
-  // helper task for Action 13 sequence control
-  if(GPIOState())   action[13].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
-}
-
-void aHelper14(void * pvParameters)
-{
-  // helper task for Action 14 sequence control
-  if(GPIOState())   action[14].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
-}
-
-void aHelper15(void * pvParameters)
-{
-  // helper task for Action 15 sequence control
-  if(GPIOState())   action[15].helper();
-  else vTaskDelay(1000 / portTICK_PERIOD_MS); // add a delay to prevent the task from consuming too much CPU time when the GPIO state is low
+  uint8_t actionNumber = *(static_cast<uint8_t*>(pvParameters));
+  while(true)
+  {
+    if(GPIOState()) action[actionNumber].helper();
+    else vTaskDelay(1000 / portTICK_PERIOD_MS);
+  }
 }
 
 

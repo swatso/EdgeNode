@@ -42,8 +42,6 @@ uint8_t MQTTnode::getNodeID()
 
 char* MQTTnode::getNodeIDstring()
 {
-  Serial.print("getNodeIDstring: ");
-  Serial.println(nodeIDstring);
   return(&nodeIDstring[0]);
 }
 
@@ -70,7 +68,7 @@ void MQTTnode::loadConfig()
   const char* brokerIPstr = readFileC(SPIFFS, brokerIPPath, defaultBrokerIP);
   for(i=0; (brokerIPstr[i] != '\0')&& (i<17); i++)node.brokerIP[i] = brokerIPstr[i];
   node.brokerIP[i]='\0';
-  Serial.print("node.brokerIP");
+  Serial.print("node.brokerIP:");
   Serial.println(node.brokerIP);
   
   //deleteFile(SPIFFS,ssidPath);
@@ -80,7 +78,6 @@ void MQTTnode::loadConfig()
   for(i=0; (ssidstr[i] != '\0')&& (i<17); i++)
   {
     node.ssid[i] = ssidstr[i];
-  Serial.println(ssidstr[i]);
   }
   node.ssid[i]='\0';
   Serial.print("node.ssid: ");

@@ -26,7 +26,7 @@
 				bit = myUrl.get('bitno');
 				await getConfig(bit);
 				document.getElementById("header").innerText = "Configuration for GPIO BitNo: " +bit;
-				showHelp(document.querySelector('input[name="type"]:checked').value);
+				showHelp(document.querySelector('input[name="type"]:checked').value, bit);
 				const gpioTypes = document.querySelectorAll('input[name="type"]');
 				gpioTypes.forEach(type => {
 				type.addEventListener('change', typeChanged);});
@@ -35,7 +35,7 @@
 			async function typeChanged()
 			{
       			const type = document.querySelector('input[name="type"]:checked');
-				showHelp(type.value);
+				showHelp(type.value, bit);
 			}
 
 			async function postit(url, content)
@@ -107,7 +107,7 @@
 	  		  ele.value = resp.publishRate;
 			};
 
-			function showHelp(type) 
+			function showHelp(type, bit) 
 			{
 				for(var i=0;i<9;i++)
 				{
@@ -120,6 +120,7 @@
 					document.getElementById("ServoEasing").style.display = 'none';
 				}
 console.log("type:" + type);
+console.log("bit:" + bit);
 
 				document.getElementById("type" + type + "1").style.display = 'block';			
 				document.getElementById("type" + type + "2").style.display = 'block';			 
@@ -127,7 +128,13 @@ console.log("type:" + type);
 				document.getElementById("type" + type + "4").style.display = 'block';					
 				document.getElementById("type" + type + "5").style.display = 'block';	
 				document.getElementById("type" + type + "8").style.display = 'block';
-				if((type == 3)||(type == 4))document.getElementById("ServoEasing").style.display = 'table-row';		
+				if((type == 3)||(type == 4))document.getElementById("ServoEasing").style.display = 'table-row';	
+
+				document.getElementById("type6").style.display = 'none';
+				document.getElementById("lbl6").style.display = 'none';
+				if((bit == 11) || (bit == 15))document.getElementById("type6").style.display = 'block'; // only allow AIN selection if bit can be configured as AIN
+				if((bit == 11) || (bit == 15))document.getElementById("lbl6").style.display = 'block'; // only allow AIN selection if bit can be configured as AIN
+
 			};
 
 		</script>
@@ -149,7 +156,7 @@ console.log("type:" + type);
     				<input type="radio" name= "type" Id="type3" value="3" 0/>SERVO
 					<input type="radio" name= "type" Id="type4" value="4" 0/>SERVO_ACTUATOR
     				<input type="radio" name= "type" Id="type5" value="5" 0/>DIGIN
-    				<input type="radio" name= "type" Id="type6" value="6" 0/>AIN
+    				<input type="radio" name= "type" Id="type6" value="6" 0/><label for="type6" Id="lbl6">AIN</label>
     				<input type="radio" name= "type" Id="type7" value="7" 0/>DIGOUT_PULSE
     				<input type="radio" name= "type" Id="type8" value="8" 0/>PWM_PULSE
     			</td>
@@ -182,7 +189,7 @@ console.log("type:" + type);
 				<span id="type32">Angle preset 0-180 deg</span>
 				<span id="type42">Angle preset 0-180 deg</span>
 				<span id="type52">Not Used</span>
-				<span id="type62">Not Used</span>
+				<span id="type62">DeadBand</span>
 				<span id="type72">Not Used</span>
 				<span id="type82">OFF PWM frequency (0-255)</span>
 				</td>

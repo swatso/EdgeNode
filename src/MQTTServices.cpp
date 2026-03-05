@@ -7,6 +7,7 @@ QueueHandle_t MQTTMessageQueue;
 
 void setupMQTTServices()
 {
+  Serial.println("(setupMQTTServices)");
   // Create a Sensor Publish queue
   MQTTSensorQueue = xQueueCreate(20, sizeof(MQTTSensor));
   if (MQTTSensorQueue == NULL) 
@@ -31,7 +32,7 @@ void MQTTPublishSensor(MQTTSensor payload)
   // Places the payload data into the MQTT Sensor Publishing Queue
   if (xQueueSend(MQTTSensorQueue, &payload, 0)) 
   {
-    Serial.printf("[Sensor Sender] Sent value: %d\n", payload.value);
+//    Serial.printf("[Sensor Sender] Sent value: %d\n", payload.value);
   } 
   else 
   {
@@ -47,7 +48,7 @@ void MQTTPublishMessage(MQTTMessagePayload payload)
   // Places the payload data into the MQTT Sensor Publishing Queue
   if (xQueueSend(MQTTMessageQueue, &payload, 0)) 
   {
-    Serial.printf("[Debug Sender] Sent value: %s\n", payload.message);
+//    Serial.printf("[Debug Sender] Sent value: %s\n", payload.message);
   } 
   else 
   {

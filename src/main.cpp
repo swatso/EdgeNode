@@ -21,27 +21,17 @@ void setup()
   delay(2000);
   setupSPIFFS();
   node.loadConfig();
-  mp3.loadConfig();
-  loadActionConfig();
   setupUserCode();
+  mp3.loadConfig();
+  setupAction();
+  loadActionConfig();
   setupGPIO();
   loadServoPositions();
   setupWiFi();
+  setupMQTTPaths();
   setupMQTTServices();
   setupMQTTComms();
   setupSound();
-  setupAction();
-
-  // configure the debug streams with nodeID and whether to append the nodeID to the topic or not (for global topics)
-  localDebug.setNodeID(node.getNodeID());
-  localDebug.appendNodeID(false);
-  localOperations.setNodeID(node.getNodeID());
-  localOperations.appendNodeID(false);
-  globalDebug.setNodeID(node.getNodeID());
-  globalOperations.setNodeID(node.getNodeID());
-  globalDebug.appendNodeID(true);
-  globalOperations.appendNodeID(true);
-
   powerGPIO(true);
 
 Serial.print("Core:");
@@ -52,6 +42,7 @@ Serial.println(xPortGetCoreID());
 
 void loop()
 {
+  pause(5000);
 getSystemInfo();
 pause(60000);
 }
@@ -66,4 +57,17 @@ void pause(long mS)
     yield();
   }
   return;
+}
+
+void setupMQTTPaths()
+{
+  // This function sets the MQTT topic paths for the debug and operations streams
+  localDebug.setNodeID(node.getNodeID());
+  localDebug.appendNodeID(false);
+  localOperations.setNodeID(node.getNodeID());
+  localOperations.appendNodeID(false);
+  globalDebug.setNodeID(node.getNodeID());
+  globalOperations.setNodeID(node.getNodeID());
+  globalDebug.appendNodeID(true);
+  globalOperations.appendNodeID(true);
 }

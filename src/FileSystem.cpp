@@ -31,7 +31,7 @@ void setupSPIFFS()
 // Simply reads a single string from SPIFFS file
 char* readFileC(fs::FS &fs, const char *path, const char *deft)
 {
-  Serial.printf("(readFileC): %s\r\n", path);
+//  Serial.printf("(readFileC): %s\r\n", path);
   vTaskDelay(20);
   xSemaphoreTake(fsLock,portMAX_DELAY);
   static char fileContent[20];
@@ -279,16 +279,16 @@ void readMP3TrackConfigFile(fs::FS &fs, uint8_t trackNo)
   mp3.track[trackNo].enableLocal = std::stoi(readConfigItem(file),NULL,10);
   mp3.track[trackNo].enableRemote = std::stoi(readConfigItem(file),NULL,10);
 
-  Serial.print("name: ");
-  Serial.println(mp3.track[trackNo].name);
-  Serial.print("volume: ");
-  Serial.println(mp3.track[trackNo].volume);
-  Serial.print("duration: ");
-  Serial.println(mp3.track[trackNo].duration);
-  Serial.print("enableLocal: "); 
-  Serial.println(mp3.track[trackNo].enableLocal);
-  Serial.print("enableRemote: ");
-  Serial.println(mp3.track[trackNo].enableRemote);
+  //Serial.print("name: ");
+  //Serial.println(mp3.track[trackNo].name);
+  //Serial.print("volume: ");
+  //Serial.println(mp3.track[trackNo].volume);
+  //Serial.print("duration: ");
+  //Serial.println(mp3.track[trackNo].duration);
+  //Serial.print("enableLocal: "); 
+  //Serial.println(mp3.track[trackNo].enableLocal);
+  //Serial.print("enableRemote: ");
+  //Serial.println(mp3.track[trackNo].enableRemote);
   file.close();
   xSemaphoreGive(fsLock);
 }
@@ -314,8 +314,8 @@ void writeServoPosition(fs::FS &fs, uint8_t bitNo, int position)
   }
   path[j]=0;
 
-Serial.print("Writing servo config file to: ");
-Serial.println(path);
+//Serial.print("Writing servo config file to: ");
+//Serial.println(path);
 
   File file = fs.open(path, FILE_WRITE);
   if(!file)
@@ -331,8 +331,8 @@ Serial.println(path);
 
 int readServoPosition(fs::FS &fs, uint8_t bitNo)
 {
-  Serial.print("Reading servo config file: ");
-  Serial.println(bitNo);
+//  Serial.print("Reading servo config file: ");
+//  Serial.println(bitNo);
   xSemaphoreTake(fsLock,portMAX_DELAY);
   vTaskDelay(10);
   char path[30];
@@ -352,7 +352,7 @@ int readServoPosition(fs::FS &fs, uint8_t bitNo)
   File file = fs.open(path, FILE_READ);
   if(!file)
   {
-    Serial.println("- failed to open servo config file for reading");
+    //Serial.println("- failed to open servo config file for reading");
     xSemaphoreGive(fsLock);
     return(-1);
   }
@@ -401,7 +401,7 @@ void writeActionConfigFile(fs::FS &fs, uint8_t number)
   File file = fs.open(path, FILE_WRITE);
   if(!file)
   {
-    Serial.println("- failed to action config file for writing");
+    //Serial.println("- failed to action config file for writing");
     xSemaphoreGive(fsLock);
     return;
   }
@@ -436,7 +436,7 @@ void readActionConfigFile(fs::FS &fs, uint8_t number)
   File file = fs.open(path, FILE_READ);
   if(!file)
   {
-    Serial.println("- failed to open action config file for reading");
+    //Serial.println("- failed to open action config file for reading");
     xSemaphoreGive(fsLock);
     return;
   }

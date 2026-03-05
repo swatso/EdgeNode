@@ -33,16 +33,6 @@ const char* PARAM_INPUT_3 = "hostName";
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 
-
-
-void playAudio(int x, bool y)
-{
-
-}
-void stopAudio()
-{
-
-}
 String brokerIP;
 //String nodeIDstring;
 int sceneNo;
@@ -170,62 +160,61 @@ void setupWiFi()
     
     // Route for /home web page
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-      Serial.println("Serve node.html");
-//      request->send(SPIFFS, "/scenes.html", "text/html", false, processor);
+      //Serial.println("Serve node.html");
       request->send(SPIFFS, "/node.html", "text/html", false);
     });
 
     // Route for /node web page
     server.on("/page/node", HTTP_GET, [](AsyncWebServerRequest *request) {
-      Serial.println("Serve node.html");
+      //Serial.println("Serve node.html");
       request->send(SPIFFS, "/node.html", "text/html", false);
     });
 
     // Route for node configuration web page
     server.on("/page/nodeconfig", HTTP_GET, [](AsyncWebServerRequest *request) {
-      Serial.println("Serve nodeConfig.html");
+      //Serial.println("Serve nodeConfig.html");
       request->send(SPIFFS, "/nodeConfig.html", "text/html", false);
     });
 
     // Route for gpio bit configuration web page
     server.on("/page/gpioconfig", HTTP_GET, [](AsyncWebServerRequest *request) {
-      Serial.println("Serve gpioConfig.html");
+      //Serial.println("Serve gpioConfig.html");
       request->send(SPIFFS, "/gpioConfig.html", "text/html", false);
     });
 
     // Route for gpio web page
     server.on("/page/gpio", HTTP_GET, [](AsyncWebServerRequest *request) {
-      Serial.println("Serve gpio.html");
+      //Serial.println("Serve gpio.html");
       request->send(SPIFFS, "/gpio.html", "text/html", false);
     });
 
     // Route for action web page
     server.on("/page/action", HTTP_GET, [](AsyncWebServerRequest *request) {
-      Serial.println("Serve action.html");
+      //Serial.println("Serve action.html");
       request->send(SPIFFS, "/action.html", "text/html", false);
     });
 
     // Route for action config web page
     server.on("/page/actionconfig", HTTP_GET, [](AsyncWebServerRequest *request) {
-      Serial.println("Serve actionconfig.html");
+      //Serial.println("Serve actionconfig.html");
       request->send(SPIFFS, "/actionConfig.html", "text/html", false);
     });
 
     // Route for sound web page
     server.on("/page/sound", HTTP_GET, [](AsyncWebServerRequest *request) {
-      Serial.println("Serve sound.html");
+      //Serial.println("Serve sound.html");
       request->send(SPIFFS, "/sound.html", "text/html", false);
     });
 
     // Route for soundConfig config web page
     server.on("/page/soundconfig", HTTP_GET, [](AsyncWebServerRequest *request) {
-      Serial.println("Serve soundConfig.html");
+      //Serial.println("Serve soundConfig.html");
       request->send(SPIFFS, "/soundConfig.html", "text/html", false);
     });
 
     // Route for /favicon
     server.on("/favicon", HTTP_GET, [](AsyncWebServerRequest *request) {
-      Serial.println("Serve favicon.png");
+      //Serial.println("Serve favicon.png");
       request->send(SPIFFS, "/Favicon.png", "image/png", false);
     });
 
@@ -236,14 +225,11 @@ void setupWiFi()
     
     server.on("/api/nodeid/value", HTTP_GET, [](AsyncWebServerRequest *request) 
     {
-      Serial.println("x");
       if (request->url() == "/api/nodeid/value") 
       {
         Serial.println("Received /api/nodeid/value GET request");
         AsyncResponseStream *response = request->beginResponseStream("application/json");
         JsonDocument doc;
-        Serial.print("nodeIDstring:");
-        Serial.println(node.getNodeIDstring());
         doc["value"] = node.getNodeIDstring();
         serializeJson(doc,*response);  
         request->send(response);
@@ -253,9 +239,8 @@ void setupWiFi()
     server.on("/api/brokerip/value", HTTP_GET, [](AsyncWebServerRequest *request) 
     {
       if (request->url() == "/api/brokerip/value") 
-      Serial.println("x");
       {
-        Serial.println("Received /api/brokerip/value GET request");
+        //Serial.println("Received /api/brokerip/value GET request");
         AsyncResponseStream *response = request->beginResponseStream("application/json");
         JsonDocument doc;
         doc["value"] = node.brokerIP;
@@ -268,7 +253,7 @@ void setupWiFi()
     {
       if (request->url() == "/api/hostname/value") 
       {
-        Serial.println("Received /api/hostname/value GET request");
+//        Serial.println("Received /api/hostname/value GET request");
         AsyncResponseStream *response = request->beginResponseStream("application/json");
         JsonDocument doc;
         doc["value"] =node.hostName;
@@ -282,7 +267,7 @@ void setupWiFi()
 
       if (request->url() == "/api/node/status") 
       {
-        Serial.println("Received /api/node/status GET request");
+//        Serial.println("Received /api/node/status GET request");
         AsyncResponseStream *response = request->beginResponseStream("application/json");
         JsonDocument doc;
         doc["WIFIuptime"] = WiFiGetCommsUptime();
@@ -299,7 +284,7 @@ void setupWiFi()
     {
       if (request->url() == "/api/mp3Player/status") 
       {
-        Serial.println("Received /api/mp3Player/status GET request");
+        //Serial.println("Received /api/mp3Player/status GET request");
         AsyncResponseStream *response = request->beginResponseStream("application/json");
         JsonDocument doc;
         doc["currentTrack"] = mp3.currentTrack;
@@ -373,8 +358,8 @@ void setupWiFi()
         char* ptr;
         if (request->hasParam("bitno")) bit = strtol(request->getParam("bitno")->value().c_str(),&ptr,10);
         else bit = 0;
-        Serial.print("Received /api/gpio/config/bit GET request Bit:");
-        Serial.println(bit);
+//        Serial.print("Received /api/gpio/config/bit GET request Bit:");
+//        Serial.println(bit);
         AsyncResponseStream *response = request->beginResponseStream("application/json");
         JsonDocument doc;
         doc["bitNo"] = bit;
@@ -405,7 +390,7 @@ void setupWiFi()
 
       if (request->url() == "/api/node/restart") 
       {
-        Serial.println("Restart Requested");
+//        Serial.println("Restart Requested");
         powerGPIO(false);
         delay(1000);
         ESP.restart();
@@ -422,12 +407,12 @@ void setupWiFi()
           else
           {
             const char* nodeID = doc["value"].as<const char*>();
-            Serial.print("MQTT NodeID:");
-            Serial.println(nodeID);    
+//            Serial.print("MQTT NodeID:");
+//            Serial.println(nodeID);    
             node.setNodeID(strtol(nodeID,NULL,16));
             writeFile(SPIFFS, nodeIDPath, node.getNodeIDstring());
-            Serial.print("MQTT NodeID:");
-            Serial.println(node.getNodeIDstring());
+//            Serial.print("MQTT NodeID:");
+//            Serial.println(node.getNodeIDstring());
           }
       }
 
@@ -446,8 +431,8 @@ void setupWiFi()
             buff = doc["value"].as<const char*>();
             writeFile(SPIFFS, brokerIPPath, buff); 
             strcpy(node.brokerIP,buff);
-            Serial.print("MQTT brokerIP:");
-            Serial.println(node.brokerIP);
+            //Serial.print("MQTT brokerIP:");
+            //Serial.println(node.brokerIP);
           }
       }
 
@@ -461,7 +446,7 @@ void setupWiFi()
           }
           else
           {
-            Serial.println("config/bit");
+            //Serial.println("config/bit");
             uint8_t bit = (int) doc["bitNo"];
             const char* buff;
             buff = doc["name"].as<const char*>();
@@ -536,8 +521,6 @@ void setupWiFi()
             gpio[bit].alwaysWrite((int) doc["value"]);
             Serial.print("GPIO Bit:");
             Serial.println(bit);
-Serial.print("Value:");
-Serial.println((int) doc["value"]);
            }
       }
 
@@ -676,8 +659,6 @@ Serial.println((int) doc["value"]);
           }
         }
       }
-///      request->send(200, "text/plain", "Done. ESP will restart, connect to your router and go to host (.local): " + hostName);
- 
       request->send(200, "text/plain", "Done. ESP will restart, connect to your router and go to host (.local): ");
       delay(3000);
       ESP.restart();
@@ -685,17 +666,6 @@ Serial.println((int) doc["value"]);
     server.begin();
   }
 }
-
-/*
-void processBitGetValue(uint8_t bit)
-{
-  AsyncResponseStream *response = request->beginResponseStream("application/json");
-  StaticJsonDocument<100> doc;
-  doc["value"] = gpio[bit].remoteRead();
-  serializeJson(doc,*response);  
-  request->send(response);         // return current values of all IO points
-}
-*/
 
 
 unsigned long WiFiGetCommsUptime()

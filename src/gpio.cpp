@@ -45,18 +45,20 @@ TaskHandle_t gpioTask13;
 TaskHandle_t gpioTask14;
 TaskHandle_t gpioTask15;
 TaskHandle_t servoSaverTask;
+static uint8_t gpioTaskIndex[16];
+TaskHandle_t* gpioTaskHandleRefs[16] = {
+  &gpioTask0, &gpioTask1, &gpioTask2, &gpioTask3,
+  &gpioTask4, &gpioTask5, &gpioTask6, &gpioTask7,
+  &gpioTask8, &gpioTask9, &gpioTask10, &gpioTask11,
+  &gpioTask12, &gpioTask13, &gpioTask14, &gpioTask15
+};
 gpioPin gpio[16];                // Create an array of GPIO Classes which can be indexed [0] to [15] to control GPIO
 
 
 void  setupGPIO()
 {
   // Call this early at startup -before loading the I/O configuration,  to instantiate objects and initialise the control structures
-  #ifdef debugGPIO
   Serial.println("setupGPIO");
-  #endif
-
-
-
   // Map the I/O pins to match the physical PCB layout
   gpio[0].pin = GPIO_BIT00;
   gpio[0].bitNo = 0;
@@ -107,22 +109,16 @@ void  setupGPIO()
   else xTaskCreatePinnedToCore(servoSaver, "ServoSaver", 3000, NULL, 1, &servoSaverTask, 0); // Core 0
 
   // Create helper tasks for each GPIO pin
-  xTaskCreatePinnedToCore(helper0, "GPIO0", 2000, NULL, 1, &gpioTask0, 0); // Core 0
-  xTaskCreatePinnedToCore(helper1, "GPIO1", 2000, NULL, 1, &gpioTask1, 0); // Core 0
-  xTaskCreatePinnedToCore(helper2, "GPIO2", 2000, NULL, 1, &gpioTask2, 0); // Core 0
-  xTaskCreatePinnedToCore(helper3, "GPIO3", 2000, NULL, 1, &gpioTask3, 0); // Core 0
-  xTaskCreatePinnedToCore(helper4, "GPIO4", 2000, NULL, 1, &gpioTask4, 0); // Core 0
-  xTaskCreatePinnedToCore(helper5, "GPIO5", 2000, NULL, 1, &gpioTask5, 0); // Core 0
-  xTaskCreatePinnedToCore(helper6, "GPIO6", 2000, NULL, 1, &gpioTask6, 0); // Core 0
-  xTaskCreatePinnedToCore(helper7, "GPIO7", 2000, NULL, 1, &gpioTask7, 0); // Core 0
-  xTaskCreatePinnedToCore(helper8, "GPIO8", 2000, NULL, 1, &gpioTask8, 0); // Core 0
-  xTaskCreatePinnedToCore(helper9, "GPIO9", 2000, NULL, 1, &gpioTask9, 0); // Core 0
-  xTaskCreatePinnedToCore(helper10, "GPIOA", 2000, NULL, 1, &gpioTask10, 0); // Core 0
-  xTaskCreatePinnedToCore(helper11, "GPIOB", 2000, NULL, 1, &gpioTask11, 0); // Core 0
-  xTaskCreatePinnedToCore(helper12, "GPIOC", 2000, NULL, 1, &gpioTask12, 0); // Core 0
-  xTaskCreatePinnedToCore(helper13, "GPIOD", 2000, NULL, 1, &gpioTask13, 0); // Core 0
-  xTaskCreatePinnedToCore(helper14, "GPIOE", 2000, NULL, 1, &gpioTask14, 0); // Core 0
-  xTaskCreatePinnedToCore(helper15, "GPIOF", 2000, NULL, 1, &gpioTask15, 0); // Core 0
+  for(uint8_t i=0; i<16; i++)
+  {
+    gpioTaskIndex[i] = i;
+    char taskName[7];
+    snprintf(taskName, sizeof(taskName), "GPIO%X", i);
+    if (xTaskCreatePinnedToCore(gpioHelperTask, taskName, 2000, &gpioTaskIndex[i], 1, gpioTaskHandleRefs[i], 0) != pdPASS)
+    {
+      Serial.printf("Failed to create GPIO helper %u\n", i);
+    }
+  }
 
   Serial.println("done setupGPIO");
 }
@@ -137,7 +133,7 @@ digitalWrite(POWER_GPIO, powerUp);
 
 bool  GPIOState()
 {
-  // Returns true if th GPIO system is running (pwered up)
+  // Returns true if the GPIO system is running (powered up)
   return digitalRead(POWER_GPIO);
 }
 
@@ -155,117 +151,30 @@ bool run2Switch()
 
 void loadServoPositions()
 {
-  Serial.println("Loading servo positions from SPIFFS");
+//  Serial.println("Loading servo positions from SPIFFS");
   // Load the last saved servo positions from the SPIFFS file system
   for(int bit=0; bit<16; bit++)
   {
     int position = readServoPosition(SPIFFS, bit);
-    Serial.print("Servo bit:");
-    Serial.print(bit);  
-    Serial.print(" Position:");
-    Serial.println(position);
+//    Serial.print("Servo bit:");
+//    Serial.print(bit);  
+//    Serial.print(" Position:");
+//    Serial.println(position);
     if((position >= 0) && (position <= 180) && ((gpio[bit].type == GPIO_SERVO)||(gpio[bit].type == GPIO_SERVO_ACTUATOR)))
     {
-      Serial.printf("Loaded position for servo %d: %d\n", bit, position);
+      //Serial.printf("Loaded position for servo %d: %d\n", bit, position);
       gpio[bit].initValue(position);
     }
   }
 }
 
-void helper0(void * pvParameters)
+void gpioHelperTask(void * pvParameters)
 {
-  // helper task for GPIO 0 servo control
-  gpio[0].helper();
-}
-
-void helper1(void * pvParameters)
-{
-  // helper task for GPIO 1 servo control
-  gpio[1].helper();
-}
-
-void helper2(void * pvParameters)
-{
-  // helper task for GPIO 2 servo control
-  gpio[2].helper();
-}
-
-void helper3(void * pvParameters)
-{
-  // helper task for GPIO 3 servo control
-  gpio[3].helper();
-}
-
-void helper4(void * pvParameters)
-{
-  // helper task for GPIO 4 servo control
-  gpio[4].helper();
-}
-
-void helper5(void * pvParameters)
-{
-  // helper task for GPIO 5 servo control
-  gpio[5].helper();
-}
-
-void helper6(void * pvParameters)
-{
-  // helper task for GPIO 6 servo control
-  gpio[6].helper();
-}
-
-void helper7(void * pvParameters)
-{
-  // helper task for GPIO 7 servo control
-  gpio[7].helper();
-}
-
-void helper8(void * pvParameters)
-{
-  // helper task for GPIO 8 servo control
-  gpio[8].helper();
-}
-
-void helper9(void * pvParameters)
-{
-  // helper task for GPIO 9 servo control
-  gpio[9].helper();
-}
-
-void helper10(void * pvParameters)
-{
-  // helper task for GPIO 10 servo control
-  gpio[10].helper();
-}
-
-void helper11(void * pvParameters)
-{
-  // helper task for GPIO 11 servo control
-  gpio[11].helper();
-}
-
-void helper12(void * pvParameters)
-{
-  // helper task for GPIO 12 servo control
-  gpio[12].helper();
-}
-
-void helper13(void * pvParameters)
-{
-  // helper task for GPIO 13 servo control
-  gpio[13].helper();
-}
-
-void helper14(void * pvParameters)
-{
-  // helper task for GPIO 14 servo control
-  gpio[14].helper();
-}
-
-void helper15(void * pvParameters)
-{
-  // helper task for GPIO 15 servo control
-  gpio[15].helper();
+  uint8_t gpioNumber = *(static_cast<uint8_t*>(pvParameters));
+  while(true)
+  {
+    gpio[gpioNumber].helper();
+  }
 }
 
 gpioPin::gpioPin()
@@ -574,9 +483,8 @@ void gpioPin::inputPoller()
   if((type == GPIO_DIGIN)||(type == GPIO_AIN))
   {
     remoteRead();            // check and publish if value has changed
-    if(publishRate == 0)return;
     // Background publishing rate will publish value even if it has not changed
-    if(millis() > nextPublish)
+    if((publishRate != 0) && (millis() > nextPublish))
     {
       Serial.println("Background publish");
       nextPublish = millis()+publishRate;

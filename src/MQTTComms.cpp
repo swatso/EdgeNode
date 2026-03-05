@@ -62,12 +62,8 @@ TaskHandle_t MQTTMessageService;
 
 void setupMQTTComms() 
 {
+  Serial.println("(setupMQTTComms)");
   initTopics(node.getNodeIDstring());
-  for(int i=0; i<16; i++)
-  {
-    //C0[i] = false;
-    //S0[i] = false;
-  } 
   client.setBufferSize(512);
   client.setServer(node.brokerIP, 1883);
   client.setCallback(MQTTcallback);
@@ -142,9 +138,8 @@ boolean  subscribeTopics()
     // We are subscribing to action topics 00 to 0F hex
     actionTopic[17]= i + 0x30;
     if(actionTopic[17] > 57)actionTopic[17]+=7;
-
-    Serial.print("Subscribing to:");
-    Serial.println(actionTopic);
+//    Serial.print("Subscribing to:");
+//    Serial.println(actionTopic);
     client.subscribe(actionTopic);
     serviceConnection();
     yield();
@@ -194,8 +189,8 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
     // This is a Turnout topic
     event = (topic[18]-0x30);
     if (event > 9)event -= 7;
-    Serial.print("(MQTTcallback) Turnout event:");
-    Serial.println(event);
+//    Serial.print("(MQTTcallback) Turnout event:");
+//    Serial.println(event);
     if(gpio[event].type == GPIO_SERVO_ACTUATOR)
     {
         // Move the servo to the preset position based on the payload value (T for preset2, M for preset1, anything else for preset0)
@@ -223,7 +218,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
     // True or Thrown paylaod will apply autoTrim volume adjustment
     if ((char)payload[0] == 'T')mp3.autoTrimEnabled=true;
     else mp3.autoTrimEnabled=false;
-    Serial.print("(MQTTcallback) AutoTrim:"); Serial.println(mp3.autoTrimEnabled);
+//    Serial.print("(MQTTcallback) AutoTrim:"); Serial.println(mp3.autoTrimEnabled);
   }
   else if (strncmp(topic, soundTopic, 12) == 0) 
   {
@@ -335,14 +330,4 @@ void initTopics(char* currentNodeID)
   for(i=0; i<30 && baseActionTopic[i] != 0; i++)actionTopic[i] = baseActionTopic[i];
   actionTopic[14]=currentNodeID[0];  
   actionTopic[15]=currentNodeID[1];
-  Serial.println(turnoutTopic);
-  Serial.println(sensorTopic);
-  Serial.println(reporterTopic);
-  Serial.println(localDebugTopic);
-  Serial.println(globalDebugTopic);
-  Serial.println(localOperationsTopic);
-  Serial.println(globalOperationsTopic);
-  Serial.println(soundTopic);
-  Serial.println(actionTopic);
-
 }
