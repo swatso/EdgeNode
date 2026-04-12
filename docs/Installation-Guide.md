@@ -31,12 +31,17 @@ cd EdgeNode
 
 ## 2. Review `platformio.ini`
 
-The build configuration is defined in `platformio.ini`:
+The build configuration is defined in `platformio.ini`. Two named build environments are provided:
+
+| Environment | Board | Hardware target macro | Description |
+|-------------|-------|-----------------------|-------------|
+| `esp32dev`  | ESP32 Dev Kit | `HW_ESP32DEV` | Original PCB hardware |
+| `esp32-c3`  | ESP32-C3 DevKitM-1 | `HW_ESP32C3` | Placeholder for future ESP32-C3 based hardware |
+
+Shared library dependencies are declared once in the `[common]` section and inherited by both environments. Each environment adds a `-D` preprocessor flag (`HW_ESP32DEV` or `HW_ESP32C3`) that source files use to select the correct GPIO pin assignments and any capability subsets.
 
 ```ini
-[env:esp32dev]
-platform = espressif32
-board = esp32dev
+[common]
 framework = arduino
 monitor_speed = 115200
 lib_deps =
@@ -47,9 +52,47 @@ lib_deps =
     esp32async/AsyncTCP@^3.4.10
     pubsubclient3@^3.3.0
     EspSoftwareSerial@^8.1.0
+
+[env:esp32dev]
+platform = espressif32
+board = esp32dev
+framework = ${common.framework}
+monitor_speed = ${common.monitor_speed}
+lib_deps = ${common.lib_deps}
+build_flags = -DHW_ESP32DEV
+
+[env:esp32-c3]
+platform = espressif32
+board = esp32-c3-devkitm-1
+framework = ${common.framework}
+monitor_speed = ${common.monitor_speed}
+lib_deps = ${common.lib_deps}
+build_flags = -DHW_ESP32C3
 ```
 
 PlatformIO will download all library dependencies automatically on the first build.
+
+### Selecting a build environment
+
+**PlatformIO IDE (VS Code)**
+
+Use the environment selector in the bottom status bar — click the environment name and choose from the list.
+
+**PlatformIO CLI**
+
+```bash
+# Build for original ESP32 Dev Kit hardware
+pio run -e esp32dev
+
+# Build for ESP32-C3 hardware (placeholder)
+pio run -e esp32-c3
+```
+
+### Adding a new hardware target
+
+1. Add a new `[env:<name>]` section in `platformio.ini` with the appropriate `board` and `build_flags = -DHW_<NAME>`.
+2. Add the corresponding `#elif defined(HW_<NAME>)` block in `include/gpio.h` with the GPIO pin assignments for the new PCB design.
+3. Use `#if defined(HW_<NAME>)` guards anywhere else in the source to include or exclude capabilities not supported by the new controller.
 
 ---
 

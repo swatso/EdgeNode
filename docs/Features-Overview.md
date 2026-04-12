@@ -102,7 +102,7 @@ All configuration is persisted to SPIFFS (ESP32 file system) so it survives powe
 
 | Component | Details |
 |-----------|---------|
-| Hardware | ESP32 Dev Kit (or compatible) |
-| Build system | PlatformIO |
+| Hardware | ESP32 Dev Kit (original) / ESP32-C3 (future) |
+| Build system | PlatformIO (multi-environment: `esp32dev`, `esp32-c3`) |
 | Framework | Arduino for ESP32 |
 | Key libraries | ESPAsyncWebServer, AsyncTCP, PubSubClient, ArduinoJson, ESP32Servo, ServoEasing, EspSoftwareSerial |
