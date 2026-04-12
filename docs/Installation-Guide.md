@@ -31,14 +31,16 @@ cd EdgeNode
 
 ## 2. Review `platformio.ini`
 
-The build configuration is defined in `platformio.ini`. Two named build environments are provided:
+The build configuration is defined in `platformio.ini`. The following build targets are available:
 
-| Environment | Board | Hardware target macro | Description |
-|-------------|-------|-----------------------|-------------|
-| `esp32dev`  | ESP32 Dev Kit | `HW_ESP32DEV` | Original PCB hardware |
-| `esp32-c3`  | ESP32-C3 DevKitM-1 | `HW_ESP32C3` | Placeholder for future ESP32-C3 based hardware |
+### Build targets
 
-Shared library dependencies are declared once in the `[common]` section and inherited by both environments. Each environment adds a `-D` preprocessor flag (`HW_ESP32DEV` or `HW_ESP32C3`) that source files use to select the correct GPIO pin assignments and any capability subsets.
+| Target | Controller | Board | Hardware macro | Description |
+|--------|-----------|-------|----------------|-------------|
+| `target1` | ESP32 | ESP32 Dev Kit | `HW_ESP32DEV` | Original PCB hardware — full GPIO complement, servos, audio |
+| `target2` | ESP32-C3 | ESP32-C3 DevKitM-1 | `HW_ESP32C3` | Placeholder for future ESP32-C3 based PCB (pin assignments TBD) |
+
+Shared library dependencies are declared once in the `[common]` section and inherited by all targets. Each target adds a `-D` preprocessor flag (`HW_ESP32DEV` or `HW_ESP32C3`) that source files use to select the correct GPIO pin assignments and any capability subsets.
 
 ```ini
 [common]
@@ -53,7 +55,7 @@ lib_deps =
     pubsubclient3@^3.3.0
     EspSoftwareSerial@^8.1.0
 
-[env:esp32dev]
+[env:target1]
 platform = espressif32
 board = esp32dev
 framework = ${common.framework}
@@ -61,7 +63,7 @@ monitor_speed = ${common.monitor_speed}
 lib_deps = ${common.lib_deps}
 build_flags = -DHW_ESP32DEV
 
-[env:esp32-c3]
+[env:target2]
 platform = espressif32
 board = esp32-c3-devkitm-1
 framework = ${common.framework}
@@ -72,25 +74,25 @@ build_flags = -DHW_ESP32C3
 
 PlatformIO will download all library dependencies automatically on the first build.
 
-### Selecting a build environment
+### Selecting a build target
 
 **PlatformIO IDE (VS Code)**
 
-Use the environment selector in the bottom status bar — click the environment name and choose from the list.
+Use the environment selector in the bottom status bar — click the target name and choose from the list.
 
 **PlatformIO CLI**
 
 ```bash
-# Build for original ESP32 Dev Kit hardware
-pio run -e esp32dev
+# Build for Target 1 (ESP32 Dev Kit — original PCB hardware)
+pio run -e target1
 
-# Build for ESP32-C3 hardware (placeholder)
-pio run -e esp32-c3
+# Build for Target 2 (ESP32-C3 — future PCB hardware, placeholder)
+pio run -e target2
 ```
 
 ### Adding a new hardware target
 
-1. Add a new `[env:<name>]` section in `platformio.ini` with the appropriate `board` and `build_flags = -DHW_<NAME>`.
+1. Add a new `[env:target<N>]` section in `platformio.ini` with the appropriate `board` and `build_flags = -DHW_<NAME>`.
 2. Add the corresponding `#elif defined(HW_<NAME>)` block in `include/gpio.h` with the GPIO pin assignments for the new PCB design.
 3. Use `#if defined(HW_<NAME>)` guards anywhere else in the source to include or exclude capabilities not supported by the new controller.
 
@@ -138,7 +140,7 @@ The web interface HTML files in `data/` must be uploaded to the ESP32 SPIFFS par
 In VS Code with PlatformIO:
 
 1. Open the PlatformIO sidebar.
-2. Under your environment (`esp32dev`), select **Platform → Upload Filesystem Image**.
+2. Under your target (e.g. `target1`), select **Platform → Upload Filesystem Image**.
 
 ### Using PlatformIO CLI
 
