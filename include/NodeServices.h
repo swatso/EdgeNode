@@ -9,8 +9,8 @@
 #define defaultBrokerIP "192.168.0.2"
 #define defaultNodeID "00"
 #define defaultHostName "node00"
-#define defaultSSID "VM7320635"
-#define defaultPassword "kfcr7fsXxcs8"
+#define defaultSSID "defaultSSID"
+#define defaultPassword "defaultPassword"
   
 
 extern const char* ssidPath;
