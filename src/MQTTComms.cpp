@@ -36,11 +36,11 @@ Ticker runMQTT;
 
 long MQTTConnectionTime;
 
-const char* baseSensorTopic = "iot/io/sensor/nn00";
-const char* baseTurnoutTopic = "iot/io/turnout/nn00";
-const char* baseSoundTopic = "iot/io/sound/nn00";
-const char* soundAutoTrimTopic = "iot/io/sound/autotrim";
-const char* baseActionTopic = "iot/io/action/nn00";
+const char* baseSensorTopic = "track/sensor/nn00";
+const char* baseTurnoutTopic = "track/turnout/nn00";
+const char* baseSoundTopic = "track/sound/nn00";
+const char* soundAutoTrimTopic = "track/sound/autotrim";
+const char* baseActionTopic = "track/action/nn00";
 char sensorTopic[30];
 char turnoutTopic[30];
 char reporterTopic[30];
@@ -108,10 +108,10 @@ boolean  subscribeTopics()
   for(i=0; i<16; i++)
   {
     // We are subscribing to turnout topics 00 to 0F hex
-    turnoutTopic[18]= i + 0x30;
-    if(turnoutTopic[18] > 57)turnoutTopic[18]+=7;
+    turnoutTopic[17]= i + 0x30;
+    if(turnoutTopic[17] > 57)turnoutTopic[17]+=7;
 
-    subscription.assign(turnoutTopic,19);
+    subscription.assign(turnoutTopic,18);
     client.subscribe(subscription.c_str());
     serviceConnection();
     yield();
@@ -121,10 +121,10 @@ boolean  subscribeTopics()
   for(i=0; i<16; i++)
   {
     // We are subscribing to sound topics 00 to 0F hex
-    soundTopic[16]= i + 0x30;
-    if(soundTopic[16] > 57)soundTopic[16]+=7;
+    soundTopic[15]= i + 0x30;
+    if(soundTopic[15] > 57)soundTopic[15]+=7;
 
-    subscription.assign(soundTopic,19);
+    subscription.assign(soundTopic,18);
     client.subscribe(subscription.c_str());
     serviceConnection();
     yield();
@@ -136,8 +136,8 @@ boolean  subscribeTopics()
   for(i=0; i<17; i++)
   {
     // We are subscribing to action topics 00 to 0F hex
-    actionTopic[17]= i + 0x30;
-    if(actionTopic[17] > 57)actionTopic[17]+=7;
+    actionTopic[16]= i + 0x30;
+    if(actionTopic[16] > 57)actionTopic[16]+=7;
 //    Serial.print("Subscribing to:");
 //    Serial.println(actionTopic);
     client.subscribe(actionTopic);
@@ -319,15 +319,15 @@ void initTopics(char* currentNodeID)
   // Build the basic subscription strings by inserting the node ID
   int i;
   for(i=0; i<30 && baseTurnoutTopic[i] != 0; i++)turnoutTopic[i] = baseTurnoutTopic[i];
-  turnoutTopic[15]=currentNodeID[0];
-  turnoutTopic[16]=currentNodeID[1];  
+  turnoutTopic[14]=currentNodeID[0];
+  turnoutTopic[15]=currentNodeID[1];  
   for(i=0; i<30 && baseSensorTopic[i] != 0; i++)sensorTopic[i] = baseSensorTopic[i];
-  sensorTopic[14]=currentNodeID[0];
-  sensorTopic[15]=currentNodeID[1];  
+  sensorTopic[13]=currentNodeID[0];
+  sensorTopic[14]=currentNodeID[1];  
   for(i=0; i<30 && baseSoundTopic[i] != 0; i++)soundTopic[i] = baseSoundTopic[i];
-  soundTopic[13]=currentNodeID[0];  
-  soundTopic[14]=currentNodeID[1];
+  soundTopic[12]=currentNodeID[0];  
+  soundTopic[13]=currentNodeID[1];
   for(i=0; i<30 && baseActionTopic[i] != 0; i++)actionTopic[i] = baseActionTopic[i];
-  actionTopic[14]=currentNodeID[0];  
-  actionTopic[15]=currentNodeID[1];
+  actionTopic[13]=currentNodeID[0];  
+  actionTopic[14]=currentNodeID[1];
 }
