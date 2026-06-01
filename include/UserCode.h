@@ -3,16 +3,19 @@
 
 #include <Arduino.h>
 #include "action.h"
+#include "GCodeControl.h"
 
 void setupUserCode();
-bool sendGCodeFile(const char* filePath);
-bool sendGCodeFileList(const char* listFilePath);
 int action1PlayFcn(uint8_t number);
 int action1StopFcn(uint8_t number);
 int action2PlayFcn(uint8_t number);
 int action2StopFcn(uint8_t number);
 int action3PlayFcn(uint8_t number);
 int action3StopFcn(uint8_t number);
+int action4PlayFcn(uint8_t number);
+int action4StopFcn(uint8_t number);
+int action5PlayFcn(uint8_t number);
+int action5StopFcn(uint8_t number);
 int templatePlayFcn(uint8_t number);
 int templateStopFcn(uint8_t number);
 int runSwitchHandler(uint8_t number);

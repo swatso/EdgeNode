@@ -23,198 +23,7 @@
 #include "gpio.h"
 #include "action.h"
 #include "sound.h"
-#include "marlin_handshake.h"
-#include <SPIFFS.h>
-
-HardwareSerial gcodeUart(1);  // UART1 (use 1 or 2 typically)
-MarlinHandshake<> handshake(gcodeUart);
-/*TaskHandle_t MarlinCNCTask;
-char GCodeLine[128]; // Buffer to hold the next G-code line to send to Marlin
-
-void MarlinCNCHelper(void * pvParameters)
-{
-  while(true)
-  {
-    handshake.processInput();
-    if(handshake.canSendNow())
-    {
-      // Send the next command to Marlin if there are no commands in flight
-      // For example, you could read the next command from a queue and send it using handshake.sendLine(command);
-      if(strlen(GCodeLine) != 0)
-      {
-        handshake.sendLine(GCodeLine); // Send the next G-code line to Marlin
-        Serial.println("Sent G-code to Marlin:");
-        Serial.println(GCodeLine);
-        GCodeLine[0] = '\0'; // Clear the buffer after sending
-      }
-    }
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-  }
-}
-*/
-
-void MarlinSender(const char* line) {
-  while (!handshake.canSendNow()) {
-    // Wait until it's safe to send the next command
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-    handshake.processInput(); // Process any incoming responses from Marlin
-  }
-  handshake.sendLine(line);
-  Serial.println("Sent G-code to Marlin:");
-  Serial.println(line);
-  vTaskDelay(100 / portTICK_PERIOD_MS);
-}
-
-bool sendGCodeFile(const char* filePath)
-{
-  if ((filePath == nullptr) || (filePath[0] == '\0'))
-  {
-    localDebug.println("G-code file path is empty");
-    return false;
-  }
-
-  File gcodeFile = SPIFFS.open(filePath, FILE_READ);
-  if (!gcodeFile || gcodeFile.isDirectory())
-  {
-    localDebug.println("Failed to open G-code file: " + String(filePath));
-    return false;
-  }
-
-  localDebug.println("Sending G-code from file: " + String(filePath));
-
-  char lineBuffer[128];
-  size_t sentLines = 0;
-
-  while (gcodeFile.available())
-  {
-    size_t len = gcodeFile.readBytesUntil('\n', lineBuffer, sizeof(lineBuffer) - 1);
-    lineBuffer[len] = '\0';
-
-    while ((len > 0) && ((lineBuffer[len - 1] == '\r') || (lineBuffer[len - 1] == ' ') || (lineBuffer[len - 1] == '\t')))
-    {
-      lineBuffer[--len] = '\0';
-    }
-
-    size_t start = 0;
-    while ((lineBuffer[start] == ' ') || (lineBuffer[start] == '\t'))
-    {
-      ++start;
-    }
-
-    char* line = &lineBuffer[start];
-    if (line[0] == '\0')
-    {
-      continue;
-    }
-
-    if (line[0] == ';')
-    {
-      continue;
-    }
-
-    char* inlineComment = strchr(line, ';');
-    if (inlineComment != nullptr)
-    {
-      *inlineComment = '\0';
-
-      size_t trimmedLen = strlen(line);
-      while ((trimmedLen > 0) && ((line[trimmedLen - 1] == ' ') || (line[trimmedLen - 1] == '\t')))
-      {
-        line[--trimmedLen] = '\0';
-      }
-
-      if (line[0] == '\0')
-      {
-        continue;
-      }
-    }
-
-    MarlinSender(line);
-    ++sentLines;
-  }
-
-  gcodeFile.close();
-  localDebug.println("Finished G-code file send, lines sent: " + String(sentLines));
-  return true;
-}
-
-bool sendGCodeFileList(const char* listFilePath)
-{
-  if ((listFilePath == nullptr) || (listFilePath[0] == '\0'))
-  {
-    localDebug.println("G-code list file path is empty");
-    return false;
-  }
-
-  File listFile = SPIFFS.open(listFilePath, FILE_READ);
-  if (!listFile || listFile.isDirectory())
-  {
-    localDebug.println("Failed to open G-code list file: " + String(listFilePath));
-    return false;
-  }
-
-  localDebug.println("Sending G-code files from list: " + String(listFilePath));
-
-  char pathBuffer[128];
-  size_t fileCount = 0;
-  bool allSucceeded = true;
-
-  while (listFile.available())
-  {
-    size_t len = listFile.readBytesUntil('\n', pathBuffer, sizeof(pathBuffer) - 1);
-    pathBuffer[len] = '\0';
-
-    while ((len > 0) && ((pathBuffer[len - 1] == '\r') || (pathBuffer[len - 1] == ' ') || (pathBuffer[len - 1] == '\t')))
-    {
-      pathBuffer[--len] = '\0';
-    }
-
-    size_t start = 0;
-    while ((pathBuffer[start] == ' ') || (pathBuffer[start] == '\t'))
-    {
-      ++start;
-    }
-
-    char* gcodePath = &pathBuffer[start];
-    if (gcodePath[0] == '\0')
-    {
-      continue;
-    }
-
-    if (gcodePath[0] == ';')
-    {
-      continue;
-    }
-
-    char* inlineComment = strchr(gcodePath, ';');
-    if (inlineComment != nullptr)
-    {
-      *inlineComment = '\0';
-
-      size_t trimmedLen = strlen(gcodePath);
-      while ((trimmedLen > 0) && ((gcodePath[trimmedLen - 1] == ' ') || (gcodePath[trimmedLen - 1] == '\t')))
-      {
-        gcodePath[--trimmedLen] = '\0';
-      }
-
-      if (gcodePath[0] == '\0')
-      {
-        continue;
-      }
-    }
-
-    ++fileCount;
-    if (!sendGCodeFile(gcodePath))
-    {
-      localDebug.println("Failed while sending listed file: " + String(gcodePath));
-      allSucceeded = false;
-    }
-  }
-
-  listFile.close();
-  localDebug.println("Finished G-code list send, files processed: " + String(fileCount));
-  return allSucceeded;
-}
+#include "GCodeControl.h"
 
 void setupUserCode() 
 {
@@ -223,7 +32,7 @@ void setupUserCode()
     // For example, to set the play and stop functions for Action 0 to the template functions defined below:
 
     // hardcode GPIO types here
-    gcodeUart.begin(250000, SERIAL_8N1, 22, 23);  // baud, config, RX pin, TX pin
+    initGCodeControl();
 
     // Create a helper task for Marlin handshake processing
     /*if (xTaskCreatePinnedToCore(MarlinCNCHelper, "MarlinCNCTask", 3000, nullptr, 1, &MarlinCNCTask, 0) != pdPASS)
@@ -293,13 +102,21 @@ void setupUserCode()
     action[1].setActionPlayFunction(action1PlayFcn);
     action[1].setActionStopFunction(action1StopFcn);
 
-    strcpy(action[2].name, "GCode File Send");
+    strcpy(action[2].name, "GCode RFID1 Send");
     action[2].setActionPlayFunction(action2PlayFcn);
     action[2].setActionStopFunction(action2StopFcn);
 
-    strcpy(action[3].name, "GCode List Send");
+    strcpy(action[3].name, "GCode RFID2 Send");
     action[3].setActionPlayFunction(action3PlayFcn);
     action[3].setActionStopFunction(action3StopFcn);
+
+    strcpy(action[4].name, "GCode RFID3 Send");
+    action[4].setActionPlayFunction(action4PlayFcn);
+    action[4].setActionStopFunction(action4StopFcn);
+
+    strcpy(action[5].name, "GCode List Send");
+    action[5].setActionPlayFunction(action5PlayFcn);
+    action[5].setActionStopFunction(action5StopFcn);
 
     // define an example action to monitor RUN1 switch with the runSwitchHandler function defined below. This action will be scheduled to run every 500 mS to check the state of the RUN1 switch and start/stop the action sequence for action 0 based on the state of the switch.
     strcpy(action[15].name, "RUN1 switch Action");
@@ -433,7 +250,7 @@ int action1StopFcn(uint8_t number)
 int action2PlayFcn(uint8_t number)
 {
   (void)number;
-  const char* gcodeFilePath = "/job.gcode";
+  const char* gcodeFilePath = "/pathRFID1.gcode";
 
   if (!sendGCodeFile(gcodeFilePath))
   {
@@ -454,19 +271,61 @@ int action2StopFcn(uint8_t number)
 int action3PlayFcn(uint8_t number)
 {
   (void)number;
-  const char* gcodeListPath = "/joblist.txt";
+  const char* gcodeFilePath = "/pathRFID2.gcode";
 
-  if (!sendGCodeFileList(gcodeListPath))
+  if (!sendGCodeFile(gcodeFilePath))
   {
-    localDebug.println("Action 3 completed with errors from list: " + String(gcodeListPath));
+    localDebug.println("Action 3 failed to send G-code file: " + String(gcodeFilePath));
     return(0);
   }
 
-  localDebug.println("Action 3 sent all files from list: " + String(gcodeListPath));
+  localDebug.println("Action 3 sent G-code file: " + String(gcodeFilePath));
   return(0);
 }
 
 int action3StopFcn(uint8_t number)
+{
+  action[number].stop(CMD_LOCAL);
+  return(0);
+}
+
+int action4PlayFcn(uint8_t number)
+{
+  (void)number;
+  const char* gcodeFilePath = "/pathRFID3.gcode";
+
+  if (!sendGCodeFile(gcodeFilePath))
+  {
+    localDebug.println("Action 4 failed to send G-code file: " + String(gcodeFilePath));
+    return(0);
+  }
+
+  localDebug.println("Action 4 sent G-code file: " + String(gcodeFilePath));
+  return(0);
+}
+
+int action4StopFcn(uint8_t number)
+{
+  action[number].stop(CMD_LOCAL);
+  return(0);
+}
+
+int action5PlayFcn(uint8_t number)
+{
+  (void)number;
+  const char* gcodeListPath = "/joblist.txt";
+
+  if (!sendGCodeFileList(gcodeListPath))
+  {
+    localDebug.println("Action 5 completed with errors from list: " + String(gcodeListPath));
+    return(0);
+  }
+
+  localDebug.println("Action 5 sent all files from list: " + String(gcodeListPath));
+  return(0);
+}
+
+int action5StopFcn(uint8_t number)
 {
   action[number].stop(CMD_LOCAL);
   return(0);
