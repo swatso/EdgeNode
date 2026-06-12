@@ -19,6 +19,7 @@
 //
 
 #include <string>
+#include <cstring>
 #include <Ticker.h>
 #include <PubSubClient.h>         // MQTT library
 #include <WiFi.h>
@@ -31,6 +32,7 @@
 #include "gpio.h"
 #include "sound.h"
 #include "action.h"
+#include "GCodeControl.h"
 
 Ticker runMQTT;
 
@@ -41,6 +43,8 @@ const char* baseTurnoutTopic = "track/turnout/nn00";
 const char* baseSoundTopic = "track/sound/nn00";
 const char* soundAutoTrimTopic = "track/sound/autotrim";
 const char* baseActionTopic = "track/action/nn00";
+const char* RFIDReporterTopic = "track/reporter/2500";
+const char* GCodeDriverReporterTopic = "track/reporter/2700";
 char sensorTopic[30];
 char turnoutTopic[30];
 char reporterTopic[30];
@@ -144,6 +148,11 @@ boolean  subscribeTopics()
     serviceConnection();
     yield();
   }
+
+  // subscribe to the RFID reporter topic for identifying GCode objects as they pass the RFID reader
+  client.subscribe(RFIDReporterTopic);
+  client.subscribe(GCodeDriverReporterTopic);
+
   return(true);
 }
 
@@ -219,6 +228,41 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
     if ((char)payload[0] == 'T')mp3.autoTrimEnabled=true;
     else mp3.autoTrimEnabled=false;
     Serial.print("(MQTTcallback) AutoTrim:"); Serial.println(mp3.autoTrimEnabled);
+  }
+  else if (strncmp(topic, RFIDReporterTopic, strlen(RFIDReporterTopic)) == 0) 
+  {
+    // This is an RFID Reporter topic
+    char rfidPayload[21];
+    size_t copyLen = length;
+    if (copyLen > (sizeof(rfidPayload) - 1))
+    {
+      copyLen = sizeof(rfidPayload) - 1;
+    }
+
+    memcpy(rfidPayload, payload, copyLen);
+    rfidPayload[copyLen] = '\0';
+
+    Serial.print("(MQTTcallback) RFID Reporter event:");
+    Serial.println(rfidPayload);
+    GCodeObjectRFIDReporter(rfidPayload);
+
+  }
+    else if (strncmp(topic, GCodeDriverReporterTopic, strlen(GCodeDriverReporterTopic)) == 0) 
+  {
+    // This is a GCode Driver Reporter topic
+    char gcodePayload[128];
+    size_t copyLen = length;
+    if (copyLen > (sizeof(gcodePayload) - 1))
+    {
+      copyLen = sizeof(gcodePayload) - 1;
+    }
+
+    memcpy(gcodePayload, payload, copyLen);
+    gcodePayload[copyLen] = '\0';
+
+    MarlinSender(gcodePayload); // Send the home command to Marlin
+    Serial.print("(MQTTcallback) GCode Driver Reporter event:");
+    Serial.println(gcodePayload);
   }
   else if (strncmp(topic, soundTopic, 12) == 0) 
   {
@@ -327,6 +371,9 @@ void initTopics(char* currentNodeID)
   for(i=0; i<30 && baseSoundTopic[i] != 0; i++)soundTopic[i] = baseSoundTopic[i];
   soundTopic[12]=currentNodeID[0];  
   soundTopic[13]=currentNodeID[1];
+  for(i=0; i<30 && baseActionTopic[i] != 0; i++)actionTopic[i] = baseActionTopic[i];
+  actionTopic[13]=currentNodeID[0];  
+  actionTopic[14]=currentNodeID[1];
   for(i=0; i<30 && baseActionTopic[i] != 0; i++)actionTopic[i] = baseActionTopic[i];
   actionTopic[13]=currentNodeID[0];  
   actionTopic[14]=currentNodeID[1];

@@ -118,6 +118,10 @@ void setupUserCode()
     action[5].setActionPlayFunction(action5PlayFcn);
     action[5].setActionStopFunction(action5StopFcn);
 
+    strcpy(action[6].name, "GCode Load Object");
+    action[6].setActionPlayFunction(action6PlayFcn);
+    action[6].setActionStopFunction(action6StopFcn);
+
     // define an example action to monitor RUN1 switch with the runSwitchHandler function defined below. This action will be scheduled to run every 500 mS to check the state of the RUN1 switch and start/stop the action sequence for action 0 based on the state of the switch.
     strcpy(action[15].name, "RUN1 switch Action");
     action[15].setActionPlayFunction(runSwitchHandler);
@@ -221,24 +225,17 @@ int templateStopFcn(uint8_t number)
 
 int action1PlayFcn(uint8_t number)
 {
-  float x = 100;
-  float y = 100;
-  float z = 90;
-  float feedrate = 800;
+  (void)number;
+  const char* gcodeFilePath = "/home.gcode";
 
-  char GCodeLine[128]; // Buffer to hold the next G-code line to send to Marlin
+  if (!sendGCodeFile(gcodeFilePath))
+  {
+    localDebug.println("Action 1 failed to send G-code file: " + String(gcodeFilePath));
+    return(0);
+  }
 
-  snprintf(GCodeLine, sizeof(GCodeLine), "G28 X%.3f Y%.3f Z%.3f F%.1f", x, y, z, feedrate);
-  MarlinSender(GCodeLine); // Send the home command to Marlin
-  localDebug.println("Sent G-code command to home X, Y and Z axes");
-
-  x=100;
-  y=100;
-  snprintf(GCodeLine, sizeof(GCodeLine), "G1 X%.3f Y%.3f Z%.3f F%.1f", x, y, z, feedrate);
-  MarlinSender(GCodeLine); // Send the move command to Marlin
-  localDebug.println("Sent G-code command to move X, Y and Z axes");
-
-  return(0);       // Done
+  localDebug.println("Action 1 sent G-code file: " + String(gcodeFilePath));
+  return(0);
 }
 
 int action1StopFcn(uint8_t number)
@@ -326,6 +323,21 @@ int action5PlayFcn(uint8_t number)
 }
 
 int action5StopFcn(uint8_t number)
+{
+  action[number].stop(CMD_LOCAL);
+  return(0);
+}
+
+
+
+int action6PlayFcn(uint8_t number)
+{
+  loadGCodeObject();
+  localDebug.println("Action 6 load GCode Object");
+  return(0);
+}
+
+int action6StopFcn(uint8_t number)
 {
   action[number].stop(CMD_LOCAL);
   return(0);

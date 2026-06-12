@@ -1,0 +1,13 @@
+; Onboarding RFID object path 1
+; Homes the puck
+M106 S0
+G21
+G90
+G28
+M206 Z8
+G28
+G1 X0 Y0 Z0
+G4 S2
+G1 E0 F1800
+G1 X0.000 Y0.000 Z90.000 F0.0
+
