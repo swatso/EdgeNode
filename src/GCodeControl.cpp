@@ -2,6 +2,7 @@
 
 #include "debugStream.h"
 #include "marlin_handshake.h"
+#include "MQTTComms.h"
 
 #include <SPIFFS.h>
 #include <cstring>
@@ -41,10 +42,69 @@ void normalizeRFIDTag(const char* input, char* output, size_t outputSize)
     output[--len] = '\0';
   }
 }
+
+bool parsePoseFromG1Line(char* line, float& x, float& y, float& bearing)
+{
+  if (line == nullptr)
+  {
+    return false;
+  }
+
+  while ((*line == ' ') || (*line == '\t'))
+  {
+    ++line;
+  }
+
+  if ((line[0] == '\0') || (line[0] == ';'))
+  {
+    return false;
+  }
+
+  char* inlineComment = strchr(line, ';');
+  if (inlineComment != nullptr)
+  {
+    *inlineComment = '\0';
+  }
+
+  bool isG1Line = false;
+  bool hasX = false;
+  bool hasY = false;
+  bool hasZ = false;
+
+  char* token = strtok(line, " \t");
+  while (token != nullptr)
+  {
+    if ((strcmp(token, "G1") == 0) || (strcmp(token, "G01") == 0))
+    {
+      isG1Line = true;
+    }
+    else if ((token[0] == 'X') && (token[1] != '\0'))
+    {
+      x = atof(&token[1]);
+      hasX = true;
+    }
+    else if ((token[0] == 'Y') && (token[1] != '\0'))
+    {
+      y = atof(&token[1]);
+      hasY = true;
+    }
+    else if ((token[0] == 'Z') && (token[1] != '\0'))
+    {
+      bearing = atof(&token[1]);
+      hasZ = true;
+    }
+
+    token = strtok(nullptr, " \t");
+  }
+
+  return isG1Line && (hasX || hasY || hasZ);
+}
 }
 
 GCodeObject gcodeObjects[16];
-int objectLoading = -1; // -1 means no object is currently being loaded, otherwise holds the index of the object being loaded
+int objectLoading = -1; // -1 means no object is currently loaded, otherwise holds the index of the object being loaded
+
+void updatePoseFromLine(char* line);
 
 void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
 {
@@ -67,8 +127,16 @@ void MarlinSender(const char* line) {
     handshake.processInput(); // Process any incoming responses from Marlin
   }
   handshake.sendLine(line);
+  publishReporterLine(line);
   Serial.println("Sent G-code to Marlin:");
   Serial.println(line);
+
+  // Parse pose from a mutable copy because tokenization modifies the buffer.
+  char poseLine[128];
+  strncpy(poseLine, line, sizeof(poseLine) - 1);
+  poseLine[sizeof(poseLine) - 1] = '\0';
+  updatePoseFromLine(poseLine);
+
   vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
@@ -234,45 +302,53 @@ void updatePoseFromFile(const char* file, int objectIndex)
     // Read through the file to find the last line starting with G1
 
     char lineBuffer[128];
-    char lastPoseLine[128] = "";
     float x = 0, y = 0, bearing = 0;
+    bool foundPose = false;
     while (gcodeFile.available())
     {
         size_t len = gcodeFile.readBytesUntil('\n', lineBuffer, sizeof(lineBuffer) - 1);
         lineBuffer[len] = '\0';
 
-        if (strncmp(lineBuffer, "G1", 2) == 0)
+      float parsedX = x;
+      float parsedY = y;
+      float parsedBearing = bearing;
+      if (parsePoseFromG1Line(lineBuffer, parsedX, parsedY, parsedBearing))
         {
-            strncpy(lastPoseLine, lineBuffer, sizeof(lastPoseLine) - 1);
-            // Line is of the form G1 X100 Y100 Z90 F800
-            // We will extract X, Y and Z values from this line
-
-            char* token = strtok(lineBuffer, " ");
-            while (token != nullptr)
-            {
-                if (token[0] == 'X')
-                {
-                    x = atof(&token[1]);
-                }
-                else if (token[0] == 'Y')
-                {
-                    y = atof(&token[1]);
-                }
-                else if (token[0] == 'Z')
-                {
-                    bearing = atof(&token[1]);
-                }
-                token = strtok(nullptr, " ");
-            }
-        }
-        // now update the pose of the object being loaded with the last pose found in the file
-        if (lastPoseLine[0] != '\0')
-        {
-            gcodeObjects[objectIndex].loadPose(x, y, bearing);
-            localDebug.println("Updated pose for object " + String(gcodeObjects[objectIndex].name) + " to (" + String(x) + ", " + String(y) + ") bearing " + String(bearing));
+        x = parsedX;
+        y = parsedY;
+        bearing = parsedBearing;
+        foundPose = true;
         }
     }
+
+    if (foundPose)
+    {
+      gcodeObjects[objectIndex].loadPose(x, y, bearing);
+      localDebug.println("Updated pose for object " + String(gcodeObjects[objectIndex].name) + " to (" + String(x) + ", " + String(y) + ") bearing " + String(bearing));
+    }
     gcodeFile.close();
+}
+
+void updatePoseFromLine(char* line)
+{
+  if (line == nullptr)
+  {
+    return;
+  }
+
+  if ((objectLoading < 0) || (objectLoading >= 16))
+  {
+    return;
+  }
+
+  float x = gcodeObjects[objectLoading].pose.x;
+  float y = gcodeObjects[objectLoading].pose.y;
+  float bearing = gcodeObjects[objectLoading].pose.heading;
+
+  if (parsePoseFromG1Line(line, x, y, bearing))
+  {
+    gcodeObjects[objectLoading].loadPose(x, y, bearing);
+  }
 }
 
 
@@ -291,7 +367,7 @@ void GCodeObjectRFIDReporter(const char* rfidTag)
     Serial.printf("Checking object %d, stored:'%s' incoming:'%s' cmp:%d\n", i, gcodeObjects[i].rfidTag, normalizedTag, cmp);
     if (cmp == 0)
     {
-      snprintf(message, sizeof(message), "Matched GCode object: %s at (%.2f, %.2f) bearing %.2f", gcodeObjects[i].name, gcodeObjects[i].x, gcodeObjects[i].y, gcodeObjects[i].bearing);
+      snprintf(message, sizeof(message), "Matched GCode object: %s at (%.2f, %.2f) bearing %.2f", gcodeObjects[i].name, gcodeObjects[i].pose.x, gcodeObjects[i].pose.y, gcodeObjects[i].pose.heading);
       localDebug.println(message);
       objectLoading = i;
       break;

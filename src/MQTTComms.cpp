@@ -43,13 +43,15 @@ const char* baseTurnoutTopic = "track/turnout/nn00";
 const char* baseSoundTopic = "track/sound/nn00";
 const char* soundAutoTrimTopic = "track/sound/autotrim";
 const char* baseActionTopic = "track/action/nn00";
+const char* baseReporterTopic = "track/reporter/nn00";
 const char* RFIDReporterTopic = "track/reporter/2500";
-const char* GCodeDriverReporterTopic = "track/reporter/2700";
+const char* GCodeDriverG1Topic = "track/reporter/2700";
 char sensorTopic[30];
 char turnoutTopic[30];
-char reporterTopic[30];
+//char reporterTopic[30];
 char soundTopic[30];
 char actionTopic[30];
+char reporterTopic[30];
 char localDebugTopic[30];
 char globalDebugTopic[30];
 char localOperationsTopic[30];
@@ -63,6 +65,121 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 TaskHandle_t MQTTSensorService;
 TaskHandle_t MQTTMessageService;
+
+namespace {
+bool buildAbsoluteG1FromRelative(const char* payload, char* output, size_t outputSize)
+{
+  if ((payload == nullptr) || (output == nullptr) || (outputSize == 0))
+  {
+    return false;
+  }
+
+  if ((objectLoading < 0) || (objectLoading >= 16))
+  {
+    return false;
+  }
+
+  char parseBuffer[128];
+  strncpy(parseBuffer, payload, sizeof(parseBuffer) - 1);
+  parseBuffer[sizeof(parseBuffer) - 1] = '\0';
+
+  char* inlineComment = strchr(parseBuffer, ';');
+  if (inlineComment != nullptr)
+  {
+    *inlineComment = '\0';
+  }
+
+  float relX = 0.0F;
+  float relY = 0.0F;
+  float relZ = 0.0F;
+  bool hasX = false;
+  bool hasY = false;
+  bool hasZ = false;
+  bool hasG1 = false;
+  char feedToken[24] = "";
+
+  char* token = strtok(parseBuffer, " \t");
+  while (token != nullptr)
+  {
+    if ((strcmp(token, "G1") == 0) || (strcmp(token, "G01") == 0))
+    {
+      hasG1 = true;
+    }
+    else if ((token[0] == 'X') && (token[1] != '\0'))
+    {
+      relX = atof(&token[1]);
+      hasX = true;
+    }
+    else if ((token[0] == 'Y') && (token[1] != '\0'))
+    {
+      relY = atof(&token[1]);
+      hasY = true;
+    }
+    else if ((token[0] == 'Z') && (token[1] != '\0'))
+    {
+      relZ = atof(&token[1]);
+      hasZ = true;
+    }
+    else if ((token[0] == 'F') && (token[1] != '\0'))
+    {
+      strncpy(feedToken, token, sizeof(feedToken) - 1);
+      feedToken[sizeof(feedToken) - 1] = '\0';
+    }
+
+    token = strtok(nullptr, " \t");
+  }
+
+  if (!hasG1)
+  {
+    return false;
+  }
+
+  float absX = gcodeObjects[objectLoading].pose.x;
+  float absY = gcodeObjects[objectLoading].pose.y;
+  float absZ = gcodeObjects[objectLoading].pose.heading;
+  const float oldX = absX;
+  const float oldY = absY;
+  const float oldZ = absZ;
+
+  if (hasX)
+  {
+    absX += relX;
+  }
+  if (hasY)
+  {
+    absY += relY;
+  }
+  if (hasZ)
+  {
+    absZ += relZ;
+  }
+
+  if (feedToken[0] != '\0')
+  {
+    snprintf(output, outputSize, "G1 X%.3f Y%.3f Z%.3f %s", absX, absY, absZ, feedToken);
+  }
+  else
+  {
+    snprintf(output, outputSize, "G1 X%.3f Y%.3f Z%.3f", absX, absY, absZ);
+  }
+
+  gcodeObjects[objectLoading].loadPose(absX, absY, absZ);
+
+  Serial.printf("(MQTTcallback) Pose update old:(%.3f, %.3f, %.3f) rel:(%.3f, %.3f, %.3f) new:(%.3f, %.3f, %.3f) feed:%s\n",
+                oldX,
+                oldY,
+                oldZ,
+                hasX ? relX : 0.0F,
+                hasY ? relY : 0.0F,
+                hasZ ? relZ : 0.0F,
+                absX,
+                absY,
+                absZ,
+                (feedToken[0] != '\0') ? feedToken : "<none>");
+
+  return true;
+}
+}
 
 void setupMQTTComms() 
 {
@@ -151,7 +268,7 @@ boolean  subscribeTopics()
 
   // subscribe to the RFID reporter topic for identifying GCode objects as they pass the RFID reader
   client.subscribe(RFIDReporterTopic);
-  client.subscribe(GCodeDriverReporterTopic);
+  client.subscribe(GCodeDriverG1Topic);
 
   return(true);
 }
@@ -165,6 +282,21 @@ boolean publishMQTT(char* topic, char* message)
       return(true);
    }
    return(false);
+}
+
+boolean publishReporterLine(const char* message)
+{
+  if ((message == nullptr) || (message[0] == '\0'))
+  {
+    return false;
+  }
+
+  if (!client.connected())
+  {
+    return false;
+  }
+
+  return client.publish(reporterTopic, message);
 }
 
 
@@ -247,9 +379,9 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
     GCodeObjectRFIDReporter(rfidPayload);
 
   }
-    else if (strncmp(topic, GCodeDriverReporterTopic, strlen(GCodeDriverReporterTopic)) == 0) 
+    else if (strncmp(topic, GCodeDriverG1Topic, strlen(GCodeDriverG1Topic)) == 0) 
   {
-    // This is a GCode Driver Reporter topic
+    // This is a GCode Driver G1 topic
     char gcodePayload[128];
     size_t copyLen = length;
     if (copyLen > (sizeof(gcodePayload) - 1))
@@ -260,9 +392,20 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
     memcpy(gcodePayload, payload, copyLen);
     gcodePayload[copyLen] = '\0';
 
-    MarlinSender(gcodePayload); // Send the home command to Marlin
-    Serial.print("(MQTTcallback) GCode Driver Reporter event:");
-    Serial.println(gcodePayload);
+    char absoluteG1[128];
+    if (buildAbsoluteG1FromRelative(gcodePayload, absoluteG1, sizeof(absoluteG1)))
+    {
+      MarlinSender(absoluteG1);
+      Serial.print("(MQTTcallback) Relative G1 converted to absolute:");
+      Serial.println(absoluteG1);
+    }
+    else
+    {
+      Serial.println("(MQTTcallback) Failed to convert relative G1 payload");
+    }
+
+    //Serial.print("(MQTTcallback) GCode Driver G1 event:");
+    //Serial.println(gcodePayload);
   }
   else if (strncmp(topic, soundTopic, 12) == 0) 
   {
@@ -377,4 +520,7 @@ void initTopics(char* currentNodeID)
   for(i=0; i<30 && baseActionTopic[i] != 0; i++)actionTopic[i] = baseActionTopic[i];
   actionTopic[13]=currentNodeID[0];  
   actionTopic[14]=currentNodeID[1];
+  for(i=0; i<30 && baseReporterTopic[i] != 0; i++)reporterTopic[i] = baseReporterTopic[i];
+  reporterTopic[15]=currentNodeID[0];
+  reporterTopic[16]=currentNodeID[1];
 }

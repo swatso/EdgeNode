@@ -13,6 +13,7 @@ boolean  subscribeTopics();
 boolean MQTTPublishNext();
 boolean publishBit(byte bitNo);
 boolean publishMQTT(char* topic, char* message);
+boolean publishReporterLine(const char* message);
 void serviceConnection();
 void sensorReceiverTask(void *pvParameters);
 void messageReceiverTask(void *pvParameters);
