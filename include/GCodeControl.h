@@ -10,6 +10,7 @@ bool sendGCodeFile(const char* filePath);
 bool sendGCodeFileList(const char* listFilePath);
 void GCodeObjectRFIDReporter(const char* rfidTag);
 void loadGCodeObject();
+bool setCurrentObjectIndex(int newIndex);
 
 class GCodeObject
 {
@@ -43,7 +44,8 @@ public:
 
 };
 
-extern GCodeObject gcodeObjects[16]; // Array to hold up to 16 GCode objects
-extern int objectLoading;
+extern GCodeObject gcodeObjects[kObjectCount]; // Array to hold up to 16 GCode objects
+extern Pose objectPoses[kObjectCount];
+extern int currentObjectIndex;
 
 #endif // GCODECONTROL_H

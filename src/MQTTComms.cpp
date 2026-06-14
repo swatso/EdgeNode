@@ -46,10 +46,10 @@ const char* baseActionTopic = "track/action/nn00";
 const char* baseReporterTopic = "track/reporter/nn00";
 const char* RFIDReporterTopic = "track/reporter/2500";
 const char* GCodeDriverG1Topic = "track/reporter/2700";
+const char* GCodeObjectIndexTopic = "track/reporter/2710";
 char sensorTopic[30];
 char turnoutTopic[30];
-//char reporterTopic[30];
-char soundTopic[30];
+char soundControlTopic[30];
 char actionTopic[30];
 char reporterTopic[30];
 char localDebugTopic[30];
@@ -74,7 +74,7 @@ bool buildAbsoluteG1FromRelative(const char* payload, char* output, size_t outpu
     return false;
   }
 
-  if ((objectLoading < 0) || (objectLoading >= 16))
+  if ((currentObjectIndex < 0) || (currentObjectIndex >= kObjectCount))
   {
     return false;
   }
@@ -134,9 +134,9 @@ bool buildAbsoluteG1FromRelative(const char* payload, char* output, size_t outpu
     return false;
   }
 
-  float absX = gcodeObjects[objectLoading].pose.x;
-  float absY = gcodeObjects[objectLoading].pose.y;
-  float absZ = gcodeObjects[objectLoading].pose.heading;
+  float absX = objectPoses[currentObjectIndex].x;
+  float absY = objectPoses[currentObjectIndex].y;
+  float absZ = objectPoses[currentObjectIndex].heading;
   const float oldX = absX;
   const float oldY = absY;
   const float oldZ = absZ;
@@ -163,7 +163,11 @@ bool buildAbsoluteG1FromRelative(const char* payload, char* output, size_t outpu
     snprintf(output, outputSize, "G1 X%.3f Y%.3f Z%.3f", absX, absY, absZ);
   }
 
-  gcodeObjects[objectLoading].loadPose(absX, absY, absZ);
+  objectPoses[currentObjectIndex].x = absX;
+  objectPoses[currentObjectIndex].y = absY;
+  objectPoses[currentObjectIndex].heading = absZ;
+  gcodeObjects[currentObjectIndex].loadPose(absX, absY, absZ);
+  gcodeObjects[currentObjectIndex].pose.forward = objectPoses[currentObjectIndex].forward;
 
   Serial.printf("(MQTTcallback) Pose update old:(%.3f, %.3f, %.3f) rel:(%.3f, %.3f, %.3f) new:(%.3f, %.3f, %.3f) feed:%s\n",
                 oldX,
@@ -242,10 +246,10 @@ boolean  subscribeTopics()
   for(i=0; i<16; i++)
   {
     // We are subscribing to sound topics 00 to 0F hex
-    soundTopic[15]= i + 0x30;
-    if(soundTopic[15] > 57)soundTopic[15]+=7;
+    soundControlTopic[15]= i + 0x30;
+    if(soundControlTopic[15] > 57)soundControlTopic[15]+=7;
 
-    subscription.assign(soundTopic,18);
+    subscription.assign(soundControlTopic,18);
     client.subscribe(subscription.c_str());
     serviceConnection();
     yield();
@@ -269,6 +273,7 @@ boolean  subscribeTopics()
   // subscribe to the RFID reporter topic for identifying GCode objects as they pass the RFID reader
   client.subscribe(RFIDReporterTopic);
   client.subscribe(GCodeDriverG1Topic);
+  client.subscribe(GCodeObjectIndexTopic);
 
   return(true);
 }
@@ -379,6 +384,36 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
     GCodeObjectRFIDReporter(rfidPayload);
 
   }
+  else if (strncmp(topic, GCodeObjectIndexTopic, strlen(GCodeObjectIndexTopic)) == 0)
+  {
+    char indexPayload[12];
+    size_t copyLen = length;
+    if (copyLen > (sizeof(indexPayload) - 1))
+    {
+      copyLen = sizeof(indexPayload) - 1;
+    }
+
+    memcpy(indexPayload, payload, copyLen);
+    indexPayload[copyLen] = '\0';
+
+    char* parseEnd = nullptr;
+    long requestedIndex = strtol(indexPayload, &parseEnd, 10);
+    if ((parseEnd == indexPayload) || (*parseEnd != '\0'))
+    {
+      Serial.print("(MQTTcallback) Invalid object index payload:");
+      Serial.println(indexPayload);
+    }
+    else if (setCurrentObjectIndex(static_cast<int>(requestedIndex)))
+    {
+      Serial.print("(MQTTcallback) Current object index set to:");
+      Serial.println(static_cast<int>(requestedIndex));
+    }
+    else
+    {
+      Serial.print("(MQTTcallback) Object index out of range:");
+      Serial.println(static_cast<int>(requestedIndex));
+    }
+  }
     else if (strncmp(topic, GCodeDriverG1Topic, strlen(GCodeDriverG1Topic)) == 0) 
   {
     // This is a GCode Driver G1 topic
@@ -407,7 +442,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
     //Serial.print("(MQTTcallback) GCode Driver G1 event:");
     //Serial.println(gcodePayload);
   }
-  else if (strncmp(topic, soundTopic, 12) == 0) 
+  else if (strncmp(topic, soundControlTopic, 12) == 0) 
   {
     // This is a Sound topic
     event = (topic[15]-0x30);
@@ -511,9 +546,9 @@ void initTopics(char* currentNodeID)
   for(i=0; i<30 && baseSensorTopic[i] != 0; i++)sensorTopic[i] = baseSensorTopic[i];
   sensorTopic[13]=currentNodeID[0];
   sensorTopic[14]=currentNodeID[1];  
-  for(i=0; i<30 && baseSoundTopic[i] != 0; i++)soundTopic[i] = baseSoundTopic[i];
-  soundTopic[12]=currentNodeID[0];  
-  soundTopic[13]=currentNodeID[1];
+  for(i=0; i<30 && baseSoundTopic[i] != 0; i++)soundControlTopic[i] = baseSoundTopic[i];
+  soundControlTopic[12]=currentNodeID[0];  
+  soundControlTopic[13]=currentNodeID[1];
   for(i=0; i<30 && baseActionTopic[i] != 0; i++)actionTopic[i] = baseActionTopic[i];
   actionTopic[13]=currentNodeID[0];  
   actionTopic[14]=currentNodeID[1];

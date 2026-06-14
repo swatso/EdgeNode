@@ -11,6 +11,151 @@ namespace {
 HardwareSerial gcodeUart(1);  // UART1 (use 1 or 2 typically)
 MarlinHandshake<> handshake(gcodeUart);
 
+constexpr uint32_t kPoseStableSaveMs = 5000;
+constexpr TickType_t kPoseMonitorIntervalTicks = pdMS_TO_TICKS(500);
+constexpr float kPoseCompareEpsilon = 0.001F;
+
+TaskHandle_t posePersistenceTaskHandle = nullptr;
+Pose lastPersistedPoses[kObjectCount];
+bool hasLastPersistedPose[kObjectCount] = {false};
+
+bool posesAreDifferent(const Pose& a, const Pose& b)
+{
+  return (fabsf(a.x - b.x) > kPoseCompareEpsilon)
+      || (fabsf(a.y - b.y) > kPoseCompareEpsilon)
+      || (fabsf(a.heading - b.heading) > kPoseCompareEpsilon)
+      || (a.forward != b.forward);
+}
+
+void buildPoseFilePath(int objectIndex, char* pathBuffer, size_t pathBufferSize)
+{
+  if ((pathBuffer == nullptr) || (pathBufferSize == 0))
+  {
+    return;
+  }
+
+  snprintf(pathBuffer, pathBufferSize, "/pose%d.txt", objectIndex);
+}
+
+bool savePoseToFile(int objectIndex, const Pose& pose)
+{
+  if ((objectIndex < 0) || (objectIndex >= kObjectCount))
+  {
+    return false;
+  }
+
+  char path[20];
+  buildPoseFilePath(objectIndex, path, sizeof(path));
+
+  File poseFile = SPIFFS.open(path, FILE_WRITE);
+  if (!poseFile || poseFile.isDirectory())
+  {
+    localDebug.println("Failed to open pose file for write: " + String(path));
+    return false;
+  }
+
+  poseFile.printf("%.3f,%.3f,%.3f,%d\n", pose.x, pose.y, pose.heading, pose.forward);
+  poseFile.close();
+  return true;
+}
+
+bool loadPoseFromFile(int objectIndex, Pose& pose)
+{
+  if ((objectIndex < 0) || (objectIndex >= kObjectCount))
+  {
+    return false;
+  }
+
+  char path[20];
+  buildPoseFilePath(objectIndex, path, sizeof(path));
+
+  File poseFile = SPIFFS.open(path, FILE_READ);
+  if (!poseFile || poseFile.isDirectory())
+  {
+    return false;
+  }
+
+  char line[64];
+  size_t len = poseFile.readBytesUntil('\n', line, sizeof(line) - 1);
+  line[len] = '\0';
+  poseFile.close();
+
+  if (len == 0)
+  {
+    return false;
+  }
+
+  float x = kDefaultObjectPose.x;
+  float y = kDefaultObjectPose.y;
+  float heading = kDefaultObjectPose.heading;
+  int forward = kDefaultObjectPose.forward;
+
+  const int parsedCount = sscanf(line, "%f,%f,%f,%d", &x, &y, &heading, &forward);
+  if (parsedCount < 3)
+  {
+    return false;
+  }
+
+  pose.x = x;
+  pose.y = y;
+  pose.heading = heading;
+  pose.forward = (parsedCount >= 4) ? forward : kDefaultObjectPose.forward;
+  return true;
+}
+
+void posePersistenceTask(void*)
+{
+  int trackedObjectIndex = -1;
+  Pose trackedPose = kDefaultObjectPose;
+  uint32_t lastPoseChangeMs = 0;
+  bool pendingSave = false;
+
+  for (;;)
+  {
+    const int idx = currentObjectIndex;
+    if ((idx < 0) || (idx >= kObjectCount))
+    {
+      trackedObjectIndex = -1;
+      pendingSave = false;
+      vTaskDelay(kPoseMonitorIntervalTicks);
+      continue;
+    }
+
+    const Pose currentPose = objectPoses[idx];
+    const uint32_t nowMs = millis();
+
+    if (trackedObjectIndex != idx)
+    {
+      trackedObjectIndex = idx;
+      trackedPose = currentPose;
+      lastPoseChangeMs = nowMs;
+      pendingSave = true;
+    }
+    else if (posesAreDifferent(currentPose, trackedPose))
+    {
+      trackedPose = currentPose;
+      lastPoseChangeMs = nowMs;
+      pendingSave = true;
+    }
+
+    if (pendingSave && ((nowMs - lastPoseChangeMs) >= kPoseStableSaveMs))
+    {
+      if (!hasLastPersistedPose[idx] || posesAreDifferent(currentPose, lastPersistedPoses[idx]))
+      {
+        if (savePoseToFile(idx, currentPose))
+        {
+          lastPersistedPoses[idx] = currentPose;
+          hasLastPersistedPose[idx] = true;
+          localDebug.println("Saved stable pose for object " + String(idx));
+        }
+      }
+      pendingSave = false;
+    }
+
+    vTaskDelay(kPoseMonitorIntervalTicks);
+  }
+}
+
 void normalizeRFIDTag(const char* input, char* output, size_t outputSize)
 {
   if ((output == nullptr) || (outputSize == 0))
@@ -101,14 +246,47 @@ bool parsePoseFromG1Line(char* line, float& x, float& y, float& bearing)
 }
 }
 
-GCodeObject gcodeObjects[16];
-int objectLoading = -1; // -1 means no object is currently loaded, otherwise holds the index of the object being loaded
+namespace {
+void syncObjectPose(int objectIndex, float x, float y, float bearing)
+{
+  if ((objectIndex < 0) || (objectIndex >= kObjectCount))
+  {
+    return;
+  }
+
+  objectPoses[objectIndex].x = x;
+  objectPoses[objectIndex].y = y;
+  objectPoses[objectIndex].heading = bearing;
+  gcodeObjects[objectIndex].loadPose(x, y, bearing);
+  gcodeObjects[objectIndex].pose.forward = objectPoses[objectIndex].forward;
+}
+}
+
+GCodeObject gcodeObjects[kObjectCount];
+Pose objectPoses[kObjectCount];
+int currentObjectIndex = -1;
 
 void updatePoseFromLine(char* line);
 
 void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
 {
   gcodeUart.begin(baud, SERIAL_8N1, rxPin, txPin);
+
+  // Initialize object poses from SPIFFS where available, otherwise use defaults.
+  for (int i = 0; i < kObjectCount; ++i)
+  {
+    Pose loadedPose = kDefaultObjectPose;
+    if (!loadPoseFromFile(i, loadedPose))
+    {
+      loadedPose = kDefaultObjectPose;
+    }
+
+    objectPoses[i] = loadedPose;
+    syncObjectPose(i, loadedPose.x, loadedPose.y, loadedPose.heading);
+    lastPersistedPoses[i] = loadedPose;
+    hasLastPersistedPose[i] = true;
+  }
+
   gcodeObjects[0].setName("Tarmac Layer");
   gcodeObjects[0].setRFIDTag("C6CB4A92");
   gcodeObjects[1].setName("JCB 3CX");
@@ -118,6 +296,56 @@ void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
   gcodeObjects[3].setName("Workmen Pipe");
   gcodeObjects[3].setRFIDTag("C6CB4A7B");
 
+  if (posePersistenceTaskHandle == nullptr)
+  {
+    xTaskCreatePinnedToCore(posePersistenceTask,
+                            "PosePersist",
+                            3072,
+                            nullptr,
+                            1,
+                            &posePersistenceTaskHandle,
+                            1);
+  }
+
+  // Home the machine to establish correct coordinates before sending any G-code files
+  sendGCodeFile("/home.gcode");
+}
+
+bool setCurrentObjectIndex(int newIndex)
+{
+  if ((newIndex < 0) || (newIndex >= kObjectCount))
+  {
+    return false;
+  }
+
+  // De-select the previous object if any
+  if ((currentObjectIndex >= 0) && (currentObjectIndex < kObjectCount))
+  {
+    for (int i = 0; i < 3; ++i)
+    {
+      MarlinSender(kObjectDeselectGCode[currentObjectIndex][i]);
+    }
+    // save its pose before switching to the new object
+    objectPoses[currentObjectIndex].x = gcodeObjects[currentObjectIndex].pose.x;
+    objectPoses[currentObjectIndex].y = gcodeObjects[currentObjectIndex].pose.y;
+    objectPoses[currentObjectIndex].heading = gcodeObjects[currentObjectIndex].pose.heading;
+  }
+
+  currentObjectIndex = newIndex;
+//  syncObjectPose(newIndex, objectPoses[newIndex].x, objectPoses[newIndex].y, objectPoses[newIndex].heading);
+
+
+  //Send the G-code to move to the new object's pose
+  char gcodeLine[128];
+  snprintf(gcodeLine, sizeof(gcodeLine), "G1 X%.3f Y%.3f Z%.3f", objectPoses[newIndex].x, objectPoses[newIndex].y, objectPoses[newIndex].heading);
+  MarlinSender(gcodeLine);
+
+  // Send the G-code to select the new object
+  for (int i = 0; i < 3; ++i)
+  {
+    MarlinSender(kObjectSelectGCode[newIndex][i]);
+  }
+return true;
 }
 
 void MarlinSender(const char* line) {
@@ -323,7 +551,7 @@ void updatePoseFromFile(const char* file, int objectIndex)
 
     if (foundPose)
     {
-      gcodeObjects[objectIndex].loadPose(x, y, bearing);
+      syncObjectPose(objectIndex, x, y, bearing);
       localDebug.println("Updated pose for object " + String(gcodeObjects[objectIndex].name) + " to (" + String(x) + ", " + String(y) + ") bearing " + String(bearing));
     }
     gcodeFile.close();
@@ -336,18 +564,18 @@ void updatePoseFromLine(char* line)
     return;
   }
 
-  if ((objectLoading < 0) || (objectLoading >= 16))
+  if ((currentObjectIndex < 0) || (currentObjectIndex >= kObjectCount))
   {
     return;
   }
 
-  float x = gcodeObjects[objectLoading].pose.x;
-  float y = gcodeObjects[objectLoading].pose.y;
-  float bearing = gcodeObjects[objectLoading].pose.heading;
+  float x = objectPoses[currentObjectIndex].x;
+  float y = objectPoses[currentObjectIndex].y;
+  float bearing = objectPoses[currentObjectIndex].heading;
 
   if (parsePoseFromG1Line(line, x, y, bearing))
   {
-    gcodeObjects[objectLoading].loadPose(x, y, bearing);
+    syncObjectPose(currentObjectIndex, x, y, bearing);
   }
 }
 
@@ -369,7 +597,7 @@ void GCodeObjectRFIDReporter(const char* rfidTag)
     {
       snprintf(message, sizeof(message), "Matched GCode object: %s at (%.2f, %.2f) bearing %.2f", gcodeObjects[i].name, gcodeObjects[i].pose.x, gcodeObjects[i].pose.y, gcodeObjects[i].pose.heading);
       localDebug.println(message);
-      objectLoading = i;
+      setCurrentObjectIndex(i);
       break;
     }
   }
@@ -384,12 +612,12 @@ void loadGCodeObject()
     //      If not then it streams the pathRFID2 which move the object closer to the RFID  reader 
     //  After this is done, if an object has been detected then its Pose is updated
 
-  objectLoading = -1; // reset to indicate no object is currently being loaded
+  currentObjectIndex = -1; // reset to indicate no object is currently being loaded
   sendGCodeFile("/pathRFID1.gcode");
   Serial.println("XXXXX");
   vTaskDelay(30000 / portTICK_PERIOD_MS);
   Serial.println("YYYYY");
-  if(objectLoading != -1)
+  if(currentObjectIndex != -1)
   {
     sendGCodeFile("/pathRFID3.gcode");      // Tag has been detected, send the path to home the puck
     localDebug.println("Object detected after first move, sent path to home the puck");
@@ -399,16 +627,16 @@ void loadGCodeObject()
     sendGCodeFile("/pathRFID2.gcode");
     localDebug.println("No object detected after first move, sent alternate path to move closer to RFID reader");
   }
-  if(objectLoading != -1)
+  if(currentObjectIndex != -1)
   {
-    gcodeObjects[objectLoading].loadPose(0, 0, 90);
-    localDebug.println("Loaded GCode object: " + String(gcodeObjects[objectLoading].name));
+    syncObjectPose(currentObjectIndex, 0, 0, 90);
+    localDebug.println("Loaded GCode object: " + String(gcodeObjects[currentObjectIndex].name));
 
     // Now send the Start Of Day file for the object to move it to its starting position
     char startOfDayFile[32];
-    snprintf(startOfDayFile, sizeof(startOfDayFile), "/startOfDay%d.gcode", objectLoading);
+    snprintf(startOfDayFile, sizeof(startOfDayFile), "/startOfDay%d.gcode", currentObjectIndex);
     sendGCodeFile(startOfDayFile);
-    updatePoseFromFile(startOfDayFile, objectLoading);
+    updatePoseFromFile(startOfDayFile, currentObjectIndex);
   }
 }
 

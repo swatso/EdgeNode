@@ -11,14 +11,7 @@ struct Pose {
 
 constexpr uint8_t kObjectCount = 16;  //0..15 = selectable Objects
 
-const Pose kInitialObjectPoses[kObjectCount] = {
-    {0.0F, 0.0F, 90.0F, 1},   // Tarmac Layer
-    {0.0F, 0.0F, 90.0F, 1},   // Road Roller
-    {0.0F, 0.0F, 270.0F, -1},  // JCB
-    {0.0F, 0.0F, 135.0F, 1}, // 3
-    {-100.0F, 0.0F, 270.0F, -1}, // 4
-    {0.0F, -100.0F, 45.0F, -1},  // 5
-};
+const Pose kDefaultObjectPose = {0.0F, 0.0F, 90.0F, 1};
 
 const char* const kInitGCode[] = {
     "G21",      // mm units
