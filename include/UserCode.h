@@ -18,6 +18,8 @@ int action5PlayFcn(uint8_t number);
 int action5StopFcn(uint8_t number);
 int action6PlayFcn(uint8_t number);
 int action6StopFcn(uint8_t number);
+int action7PlayFcn(uint8_t number);
+int action7StopFcn(uint8_t number);
 int templatePlayFcn(uint8_t number);
 int templateStopFcn(uint8_t number);
 int runSwitchHandler(uint8_t number);

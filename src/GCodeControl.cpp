@@ -6,16 +6,20 @@
 
 #include <SPIFFS.h>
 #include <cstring>
+#include "freertos/semphr.h"
 
 namespace {
 HardwareSerial gcodeUart(1);  // UART1 (use 1 or 2 typically)
 MarlinHandshake<> handshake(gcodeUart);
-
+bool RFIDEnable = false; // Flag to enable or disable RFID reporting
 constexpr uint32_t kPoseStableSaveMs = 5000;
 constexpr TickType_t kPoseMonitorIntervalTicks = pdMS_TO_TICKS(500);
 constexpr float kPoseCompareEpsilon = 0.001F;
+constexpr uint32_t kMarlinAckTimeoutMs = 6000;
+constexpr TickType_t kMarlinWaitSliceTicks = pdMS_TO_TICKS(20);
 
 TaskHandle_t posePersistenceTaskHandle = nullptr;
+SemaphoreHandle_t marlinSendMutex = nullptr;
 Pose lastPersistedPoses[kObjectCount];
 bool hasLastPersistedPose[kObjectCount] = {false};
 
@@ -251,7 +255,7 @@ void syncObjectPose(int objectIndex, float x, float y, float bearing)
 {
   if ((objectIndex < 0) || (objectIndex >= kObjectCount))
   {
-    return;
+    return; 
   }
 
   objectPoses[objectIndex].x = x;
@@ -265,12 +269,22 @@ void syncObjectPose(int objectIndex, float x, float y, float bearing)
 GCodeObject gcodeObjects[kObjectCount];
 Pose objectPoses[kObjectCount];
 int currentObjectIndex = -1;
+int RFIDObjectIndex = -1;
 
 void updatePoseFromLine(char* line);
 
 void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
 {
   gcodeUart.begin(baud, SERIAL_8N1, rxPin, txPin);
+
+  if (marlinSendMutex == nullptr)
+  {
+    marlinSendMutex = xSemaphoreCreateMutex();
+    if (marlinSendMutex == nullptr)
+    {
+      Serial.println("[initGCodeControl] ERROR: failed to create marlinSendMutex");
+    }
+  }
 
   // Initialize object poses from SPIFFS where available, otherwise use defaults.
   for (int i = 0; i < kObjectCount; ++i)
@@ -313,6 +327,9 @@ void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
 
 bool setCurrentObjectIndex(int newIndex)
 {
+  // Single point of entry to change the current object index, 
+  // ensuring that the pose is saved before switching.
+  
   if ((newIndex < 0) || (newIndex >= kObjectCount))
   {
     return false;
@@ -329,6 +346,13 @@ bool setCurrentObjectIndex(int newIndex)
     objectPoses[currentObjectIndex].x = gcodeObjects[currentObjectIndex].pose.x;
     objectPoses[currentObjectIndex].y = gcodeObjects[currentObjectIndex].pose.y;
     objectPoses[currentObjectIndex].heading = gcodeObjects[currentObjectIndex].pose.heading;
+
+    if (savePoseToFile(currentObjectIndex, objectPoses[currentObjectIndex]))
+    {
+      lastPersistedPoses[currentObjectIndex] = objectPoses[currentObjectIndex];
+      hasLastPersistedPose[currentObjectIndex] = true;
+      localDebug.println("Saved pose while switching away from object " + String(currentObjectIndex));
+    }
   }
 
   currentObjectIndex = newIndex;
@@ -349,12 +373,74 @@ return true;
 }
 
 void MarlinSender(const char* line) {
-  while (!handshake.canSendNow()) {
-    // Wait until it's safe to send the next command
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-    handshake.processInput(); // Process any incoming responses from Marlin
+  if (line == nullptr)
+  {
+    Serial.println("[MarlinSender] ERROR: null line");
+    return;
   }
+
+  if (marlinSendMutex == nullptr)
+  {
+    marlinSendMutex = xSemaphoreCreateMutex();
+    if (marlinSendMutex == nullptr)
+    {
+      Serial.println("[MarlinSender] ERROR: marlinSendMutex unavailable");
+      return;
+    }
+  }
+
+  if (xSemaphoreTake(marlinSendMutex, pdMS_TO_TICKS(10000)) != pdTRUE)
+  {
+    Serial.println("[MarlinSender] ERROR: timeout acquiring marlinSendMutex");
+    return;
+  }
+
+  Serial.printf("[MarlinSender] begin line='%s'\n", line);
+
+  const uint32_t waitStartMs = millis();
+  uint32_t lastWaitLogMs = waitStartMs;
+  size_t waitIterations = 0;
+
+  while (!handshake.canSendNow()) {
+    ++waitIterations;
+
+    handshake.processInput(); // Process any incoming responses from Marlin.
+
+    const uint32_t nowMs = millis();
+    if (handshake.isAckStalled(kMarlinAckTimeoutMs, nowMs))
+    {
+      Serial.printf("[MarlinSender] WARNING: ACK stalled for %lu ms, resetting handshake state before line='%s'\n",
+                    static_cast<unsigned long>(nowMs - waitStartMs),
+                    line);
+      localDebug.println("MarlinSender ACK stalled; resetting handshake before line: " + String(line));
+      handshake.reset();
+      break;
+    }
+
+    if ((nowMs - lastWaitLogMs) >= 1000)
+    {
+      Serial.printf("[MarlinSender] waiting canSendNow elapsed=%lu ms iterations=%u line='%s'\n",
+                    static_cast<unsigned long>(nowMs - waitStartMs),
+                    static_cast<unsigned>(waitIterations),
+                    line);
+      lastWaitLogMs = nowMs;
+    }
+
+    // Wait until it's safe to send the next command
+    vTaskDelay(kMarlinWaitSliceTicks);
+  }
+
+  const uint32_t waitedMs = millis() - waitStartMs;
+  if (waitIterations > 0)
+  {
+    Serial.printf("[MarlinSender] canSendNow after %lu ms (%u iterations)\n",
+                  static_cast<unsigned long>(waitedMs),
+                  static_cast<unsigned>(waitIterations));
+  }
+
+  Serial.println("[MarlinSender] sending line to handshake");
   handshake.sendLine(line);
+  Serial.println("[MarlinSender] sendLine returned");
   publishReporterLine(line);
   Serial.println("Sent G-code to Marlin:");
   Serial.println(line);
@@ -366,6 +452,8 @@ void MarlinSender(const char* line) {
   updatePoseFromLine(poseLine);
 
   vTaskDelay(100 / portTICK_PERIOD_MS);
+  Serial.println("[MarlinSender] done");
+  xSemaphoreGive(marlinSendMutex);
 }
 
 bool sendGCodeFile(const char* filePath)
@@ -373,25 +461,37 @@ bool sendGCodeFile(const char* filePath)
   if ((filePath == nullptr) || (filePath[0] == '\0'))
   {
     localDebug.println("G-code file path is empty");
+    Serial.println("[sendGCodeFile] ERROR: empty file path");
     return false;
   }
+
+  Serial.printf("[sendGCodeFile] START file='%s'\n", filePath);
 
   File gcodeFile = SPIFFS.open(filePath, FILE_READ);
   if (!gcodeFile || gcodeFile.isDirectory())
   {
     localDebug.println("Failed to open G-code file: " + String(filePath));
+    Serial.printf("[sendGCodeFile] ERROR: failed to open '%s'\n", filePath);
     return false;
   }
 
   localDebug.println("Sending G-code from file: " + String(filePath));
+  Serial.printf("[sendGCodeFile] Opened '%s', starting stream\n", filePath);
 
   char lineBuffer[128];
   size_t sentLines = 0;
+  size_t fileLineNumber = 0;
 
   while (gcodeFile.available())
   {
+    ++fileLineNumber;
     size_t len = gcodeFile.readBytesUntil('\n', lineBuffer, sizeof(lineBuffer) - 1);
     lineBuffer[len] = '\0';
+
+    Serial.printf("[sendGCodeFile] L%u raw='%s' (len=%u)\n",
+                  static_cast<unsigned>(fileLineNumber),
+                  lineBuffer,
+                  static_cast<unsigned>(len));
 
     while ((len > 0) && ((lineBuffer[len - 1] == '\r') || (lineBuffer[len - 1] == ' ') || (lineBuffer[len - 1] == '\t')))
     {
@@ -407,11 +507,13 @@ bool sendGCodeFile(const char* filePath)
     char* line = &lineBuffer[start];
     if (line[0] == '\0')
     {
+      Serial.printf("[sendGCodeFile] L%u skip: empty/whitespace\n", static_cast<unsigned>(fileLineNumber));
       continue;
     }
 
     if (line[0] == ';')
     {
+      Serial.printf("[sendGCodeFile] L%u skip: full-line comment\n", static_cast<unsigned>(fileLineNumber));
       continue;
     }
 
@@ -428,16 +530,20 @@ bool sendGCodeFile(const char* filePath)
 
       if (line[0] == '\0')
       {
+        Serial.printf("[sendGCodeFile] L%u skip: inline comment removed all content\n", static_cast<unsigned>(fileLineNumber));
         continue;
       }
     }
 
+    Serial.printf("[sendGCodeFile] L%u send='%s'\n", static_cast<unsigned>(fileLineNumber), line);
     MarlinSender(line);
+    Serial.printf("[sendGCodeFile] L%u sent OK\n", static_cast<unsigned>(fileLineNumber));
     ++sentLines;
   }
 
   gcodeFile.close();
   localDebug.println("Finished G-code file send, lines sent: " + String(sentLines));
+  Serial.printf("[sendGCodeFile] DONE file='%s' linesSent=%u\n", filePath, static_cast<unsigned>(sentLines));
   return true;
 }
 
@@ -582,6 +688,11 @@ void updatePoseFromLine(char* line)
 
 void GCodeObjectRFIDReporter(const char* rfidTag)
 {
+  if(RFIDEnable == false)
+  {
+    return; // RFID reporting is disabled, ignore the tag
+  }
+  // Called when an RFID tag is detected, to match it against the known GCode objects 
   char normalizedTag[sizeof(gcodeObjects[0].rfidTag)];
   normalizeRFIDTag(rfidTag, normalizedTag, sizeof(normalizedTag));
 
@@ -597,7 +708,8 @@ void GCodeObjectRFIDReporter(const char* rfidTag)
     {
       snprintf(message, sizeof(message), "Matched GCode object: %s at (%.2f, %.2f) bearing %.2f", gcodeObjects[i].name, gcodeObjects[i].pose.x, gcodeObjects[i].pose.y, gcodeObjects[i].pose.heading);
       localDebug.println(message);
-      setCurrentObjectIndex(i);
+      //setCurrentObjectIndex(i);
+      RFIDObjectIndex = i;
       break;
     }
   }
@@ -606,18 +718,18 @@ void GCodeObjectRFIDReporter(const char* rfidTag)
 void loadGCodeObject()
 {
     // This function is invoked by the user (typically via an MQTT event or by pressing a pushbutton)
-    // It performs th following actions:-
+    // It performs the following actions:-
     //      It streams file pathRFID1 to home the puck and move the object past the RFID reader
     //      If the reader has detected the object then it streams path pathRFID3 to home the puck
     //      If not then it streams the pathRFID2 which move the object closer to the RFID  reader 
     //  After this is done, if an object has been detected then its Pose is updated
+    //  Object detectio caused by the RFID reporter will set the RFIDObjectIndex to the index of the detected object, otherwise it will remain -1
 
-  currentObjectIndex = -1; // reset to indicate no object is currently being loaded
+  RFIDObjectIndex = -1; // reset to indicate no object is currently being loaded
+  RFIDEnable = true; // enable the RFID reader to detect the object
   sendGCodeFile("/pathRFID1.gcode");
-  Serial.println("XXXXX");
-  vTaskDelay(30000 / portTICK_PERIOD_MS);
-  Serial.println("YYYYY");
-  if(currentObjectIndex != -1)
+  vTaskDelay(50000 / portTICK_PERIOD_MS);
+  if(RFIDObjectIndex != -1)
   {
     sendGCodeFile("/pathRFID3.gcode");      // Tag has been detected, send the path to home the puck
     localDebug.println("Object detected after first move, sent path to home the puck");
@@ -627,16 +739,18 @@ void loadGCodeObject()
     sendGCodeFile("/pathRFID2.gcode");
     localDebug.println("No object detected after first move, sent alternate path to move closer to RFID reader");
   }
-  if(currentObjectIndex != -1)
+  vTaskDelay(50000 / portTICK_PERIOD_MS);
+  if(RFIDObjectIndex != -1)
   {
-    syncObjectPose(currentObjectIndex, 0, 0, 90);
-    localDebug.println("Loaded GCode object: " + String(gcodeObjects[currentObjectIndex].name));
+    syncObjectPose(RFIDObjectIndex, 0, 0, 90);
+    localDebug.println("Loaded GCode object: " + String(gcodeObjects[RFIDObjectIndex].name));
 
     // Now send the Start Of Day file for the object to move it to its starting position
     char startOfDayFile[32];
-    snprintf(startOfDayFile, sizeof(startOfDayFile), "/startOfDay%d.gcode", currentObjectIndex);
+    snprintf(startOfDayFile, sizeof(startOfDayFile), "/startOfDay%d.gcode", RFIDObjectIndex);
     sendGCodeFile(startOfDayFile);
-    updatePoseFromFile(startOfDayFile, currentObjectIndex);
+    updatePoseFromFile(startOfDayFile, RFIDObjectIndex);
   }
+  RFIDEnable = false; // disable the RFID reader after loading the object
 }
 

@@ -43,7 +43,7 @@ Serial.println(xPortGetCoreID());
 void loop()
 {
   pause(5000);
-getSystemInfo();
+//getSystemInfo();
 pause(60000);
 }
 

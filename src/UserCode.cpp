@@ -122,6 +122,10 @@ void setupUserCode()
     action[6].setActionPlayFunction(action6PlayFcn);
     action[6].setActionStopFunction(action6StopFcn);
 
+    strcpy(action[7].name, "play sOD3.Gcode");
+    action[7].setActionPlayFunction(action7PlayFcn);
+    action[7].setActionStopFunction(action7StopFcn);
+
     // define an example action to monitor RUN1 switch with the runSwitchHandler function defined below. This action will be scheduled to run every 500 mS to check the state of the RUN1 switch and start/stop the action sequence for action 0 based on the state of the switch.
     strcpy(action[15].name, "RUN1 switch Action");
     action[15].setActionPlayFunction(runSwitchHandler);
@@ -338,6 +342,27 @@ int action6PlayFcn(uint8_t number)
 }
 
 int action6StopFcn(uint8_t number)
+{
+  action[number].stop(CMD_LOCAL);
+  return(0);
+}
+
+int action7PlayFcn(uint8_t number)
+{
+  (void)number;
+  const char* gcodeFilePath = "/startOfDay3.gcode";
+
+  if (!sendGCodeFile(gcodeFilePath))
+  {
+    localDebug.println("Action 7 failed to send G-code file: " + String(gcodeFilePath));
+    return(0);
+  }
+
+  localDebug.println("Action 7 sent G-code file: " + String(gcodeFilePath));
+  return(0);
+}
+
+int action7StopFcn(uint8_t number)
 {
   action[number].stop(CMD_LOCAL);
   return(0);

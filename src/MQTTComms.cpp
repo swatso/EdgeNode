@@ -71,11 +71,13 @@ bool buildAbsoluteG1FromRelative(const char* payload, char* output, size_t outpu
 {
   if ((payload == nullptr) || (output == nullptr) || (outputSize == 0))
   {
+    Serial.println("Error: Null pointer or zero size in buildAbsoluteG1FromRelative");
     return false;
   }
 
   if ((currentObjectIndex < 0) || (currentObjectIndex >= kObjectCount))
   {
+    Serial.println("Error: currentObjectIndex is out of bounds in buildAbsoluteG1FromRelative");
     return false;
   }
 
@@ -368,7 +370,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
   }
   else if (strncmp(topic, RFIDReporterTopic, strlen(RFIDReporterTopic)) == 0) 
   {
-    // This is an RFID Reporter topic
+    // This is an RFID Reporter topic, called to pass an RFID tag to the controller for matching against GCode objects
     char rfidPayload[21];
     size_t copyLen = length;
     if (copyLen > (sizeof(rfidPayload) - 1))
@@ -386,6 +388,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
   }
   else if (strncmp(topic, GCodeObjectIndexTopic, strlen(GCodeObjectIndexTopic)) == 0)
   {
+    // This is a GCode Object Index topic, called to pass a manually selected object index to the controller
     char indexPayload[12];
     size_t copyLen = length;
     if (copyLen > (sizeof(indexPayload) - 1))
@@ -426,13 +429,15 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
 
     memcpy(gcodePayload, payload, copyLen);
     gcodePayload[copyLen] = '\0';
+Serial.print("(MQTTcallback) GCode Driver G1 event:");
+Serial.println(gcodePayload);
 
     char absoluteG1[128];
     if (buildAbsoluteG1FromRelative(gcodePayload, absoluteG1, sizeof(absoluteG1)))
     {
       MarlinSender(absoluteG1);
-      Serial.print("(MQTTcallback) Relative G1 converted to absolute:");
-      Serial.println(absoluteG1);
+//      Serial.print("(MQTTcallback) Relative G1 converted to absolute:");
+//      Serial.println(absoluteG1);
     }
     else
     {
@@ -466,7 +471,6 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
     else if ((char)payload[0] == 'L')action[event].play(CMD_REMOTE,true);
     else if ((char)payload[0] == 'S')action[event].stop(CMD_REMOTE);
   }
-  Serial.println(event);
 }
 
 // Receiver task: waits for gpio sensor data from the queue and publishes it
