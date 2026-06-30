@@ -12,6 +12,7 @@
 #include "MQTTComms.h"
 #include "sound.h"
 #include "action.h"
+#include "GCodeControl.h"
 
 #include <Arduino.h>                              		
 #include <WiFi.h>                                 		
@@ -32,6 +33,135 @@ const char* PARAM_INPUT_3 = "hostName";
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
+
+namespace {
+QueueHandle_t objectSelectionQueue = nullptr;
+QueueHandle_t objectRemovalQueue = nullptr;
+QueueHandle_t objectReloadQueue = nullptr;
+QueueHandle_t objectIdentifyQueue = nullptr;
+
+void objectSelectionTask(void*);
+void objectRemovalTask(void*);
+void objectReloadTask(void*);
+void objectIdentifyTask(void*);
+
+bool queueObjectSelection(int index)
+{
+  if (objectSelectionQueue == nullptr)
+  {
+    return false;
+  }
+
+  return xQueueOverwrite(objectSelectionQueue, &index) == pdTRUE;
+}
+
+bool queueObjectRemoval(int index)
+{
+  if (objectRemovalQueue == nullptr)
+  {
+    return false;
+  }
+
+  return xQueueOverwrite(objectRemovalQueue, &index) == pdTRUE;
+}
+
+bool queueObjectReload(int index)
+{
+  if (objectReloadQueue == nullptr)
+  {
+    return false;
+  }
+
+  return xQueueOverwrite(objectReloadQueue, &index) == pdTRUE;
+}
+
+bool queueObjectIdentify()
+{
+  if (objectIdentifyQueue == nullptr)
+  {
+    return false;
+  }
+
+  uint8_t trigger = 1;
+  return xQueueOverwrite(objectIdentifyQueue, &trigger) == pdTRUE;
+}
+
+void objectSelectionTask(void*)
+{
+  int index = -1;
+
+  for (;;)
+  {
+    if (xQueueReceive(objectSelectionQueue, &index, portMAX_DELAY) == pdTRUE)
+    {
+      Serial.print("select object: ");
+      Serial.println(index);
+      setCurrentObjectIndex(index);
+    }
+  }
+}
+
+void objectRemovalTask(void*)
+{
+  int index = -1;
+
+  for (;;)
+  {
+    if (xQueueReceive(objectRemovalQueue, &index, portMAX_DELAY) == pdTRUE)
+    {
+      if ((index < 0) || (index >= kObjectCount))
+      {
+        Serial.print("Invalid object removal index: ");
+        Serial.println(index);
+        continue;
+      }
+
+      Serial.print("remove object: ");
+      Serial.println(index);
+      gcodeObjects[index].pose.x = 0;
+      gcodeObjects[index].pose.y = 0;
+      gcodeObjects[index].pose.heading = 0;
+    }
+  }
+}
+
+void objectReloadTask(void*)
+{
+  int index = -1;
+
+  for (;;)
+  {
+    if (xQueueReceive(objectReloadQueue, &index, portMAX_DELAY) == pdTRUE)
+    {
+      if ((index < 0) || (index >= kObjectCount))
+      {
+        Serial.print("Invalid object reload index: ");
+        Serial.println(index);
+        continue;
+      }
+
+      Serial.print("reload object: ");
+      Serial.println(index);
+      loadGCodeObject(index);
+    }
+  }
+}
+
+void objectIdentifyTask(void*)
+{
+  uint8_t trigger = 0;
+
+  for (;;)
+  {
+    if (xQueueReceive(objectIdentifyQueue, &trigger, portMAX_DELAY) == pdTRUE)
+    {
+      (void)trigger;
+      Serial.println("identify object");
+      loadGCodeObject();
+    }
+  }
+}
+}
 
 String brokerIP;
 //String nodeIDstring;
@@ -155,6 +285,82 @@ void setupWiFi()
 {
   if(initWiFi()) 
   {
+    if (objectSelectionQueue == nullptr)
+    {
+      objectSelectionQueue = xQueueCreate(1, sizeof(int));
+      if (objectSelectionQueue != nullptr)
+      {
+        xTaskCreatePinnedToCore(objectSelectionTask,
+                                "ObjectSelect",
+                                4096,
+                                nullptr,
+                                1,
+                                nullptr,
+                                1);
+      }
+      else
+      {
+        Serial.println("Failed to create objectSelectionQueue");
+      }
+    }
+
+    if (objectRemovalQueue == nullptr)
+    {
+      objectRemovalQueue = xQueueCreate(1, sizeof(int));
+      if (objectRemovalQueue != nullptr)
+      {
+        xTaskCreatePinnedToCore(objectRemovalTask,
+                                "ObjectRemove",
+                                4096,
+                                nullptr,
+                                1,
+                                nullptr,
+                                1);
+      }
+      else
+      {
+        Serial.println("Failed to create objectRemovalQueue");
+      }
+    }
+
+    if (objectReloadQueue == nullptr)
+    {
+      objectReloadQueue = xQueueCreate(1, sizeof(int));
+      if (objectReloadQueue != nullptr)
+      {
+        xTaskCreatePinnedToCore(objectReloadTask,
+                                "ObjectReload",
+                                4096,
+                                nullptr,
+                                1,
+                                nullptr,
+                                1);
+      }
+      else
+      {
+        Serial.println("Failed to create objectReloadQueue");
+      }
+    }
+
+    if (objectIdentifyQueue == nullptr)
+    {
+      objectIdentifyQueue = xQueueCreate(1, sizeof(uint8_t));
+      if (objectIdentifyQueue != nullptr)
+      {
+        xTaskCreatePinnedToCore(objectIdentifyTask,
+                                "ObjectIdentify",
+                                4096,
+                                nullptr,
+                                1,
+                                nullptr,
+                                1);
+      }
+      else
+      {
+        Serial.println("Failed to create objectIdentifyQueue");
+      }
+    }
+
 //    Serial.println("initialising web server");
     server.serveStatic("/", SPIFFS, "/");
     
@@ -210,6 +416,12 @@ void setupWiFi()
     server.on("/page/soundconfig", HTTP_GET, [](AsyncWebServerRequest *request) {
       //Serial.println("Serve soundConfig.html");
       request->send(SPIFFS, "/soundConfig.html", "text/html", false);
+    });
+
+    // Route for Objects web page
+    server.on("/page/objects", HTTP_GET, [](AsyncWebServerRequest *request) {
+      //Serial.println("Serve objects.html");
+      request->send(SPIFFS, "/objects.html", "text/html", false);
     });
 
     // Route for /favicon
@@ -381,12 +593,51 @@ void setupWiFi()
       }
     });
 
+    server.on("/api/object/selected", HTTP_GET, [](AsyncWebServerRequest *request) 
+    {
+      long index;
+      if (request->url() == "/api/object/selected")
+      {
+        //Serial.print("Received /api/object/selected GET request returning:");
+        //Serial.println(currentObjectIndex);
+        AsyncResponseStream *response = request->beginResponseStream("application/json");
+        JsonDocument doc;
+        doc["index"] = currentObjectIndex;
+        serializeJson(doc,*response);  
+        request->send(response);
+      }
+    });
+
+    server.on("/api/object/status/index", HTTP_GET, [](AsyncWebServerRequest *request) 
+    {
+      long index;
+      if (request->url() == "/api/object/status/index")
+      {
+        // Check if "index" parameter exists in the url ( ?index=x)
+        char* ptr;
+        if (request->hasParam("index")) index = strtol(request->getParam("index")->value().c_str(),&ptr,10);
+        else index = 0;
+        //Serial.print("Received /api/object/status/index GET request index:");
+        //Serial.println(index);
+        AsyncResponseStream *response = request->beginResponseStream("application/json");
+        JsonDocument doc;
+        doc["index"] = currentObjectIndex;
+        doc["name"] = gcodeObjects[index].name;
+        doc["poseX"] = gcodeObjects[index].pose.x;
+        doc["poseY"] = gcodeObjects[index].pose.y;
+        doc["poseBrg"] = gcodeObjects[index].pose.heading;
+        serializeJson(doc,*response);  
+        request->send(response);
+      }
+    });
+
+
     // Handle POST requests
     // ********************
     server.onRequestBody([](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) 
     {
-      Serial.println("Received api POST request");
-      Serial.println(request->url());
+    //  Serial.println("Received api POST request");
+    //  Serial.println(request->url());
 
       if (request->url() == "/api/node/restart") 
       {
@@ -608,6 +859,70 @@ void setupWiFi()
             mp3.stop(CMD_ANY);
             if((track >= 0)&&(track<16))mp3.stop(CMD_ANY);             
             //Serial.println(track);
+          }
+      }
+
+      if (request->url() == "/api/object/select") 
+      {
+          JsonDocument doc;
+          DeserializationError error = deserializeJson(doc, (const char*)data);
+          if(error)
+          {
+              Serial.println("Deserialisationerror");
+          }
+          else
+          {
+            int index = (int) doc["index"];
+            if (!queueObjectSelection(index))
+            {
+              Serial.println("Failed to queue object selection");
+            }
+          }
+      }
+
+      if (request->url() == "/api/object/remove") 
+      {
+          JsonDocument doc;
+          DeserializationError error = deserializeJson(doc, (const char*)data);
+          if(error)
+          {
+              Serial.println("Deserialisationerror");
+          }
+          else
+          {
+            int index = (int) doc["index"];
+            if (!queueObjectRemoval(index))
+            {
+              Serial.println("Failed to queue object removal");
+            }
+          }
+      }
+
+      if (request->url() == "/api/object/reload") 
+      {
+          JsonDocument doc;
+          DeserializationError error = deserializeJson(doc, (const char*)data);
+          if(error)
+          {
+              Serial.println("Deserialisationerror");
+          }
+          else
+          {
+            int index = (int) doc["index"];
+            if (!queueObjectReload(index))
+            {
+              Serial.println("Failed to queue object reload");
+            }
+          }
+      }
+
+      if (request->url() == "/api/object/identify") 
+      {
+          Serial.println("Received /api/object/identify POST request");
+          // No payload is required for identify; queue the task regardless of body content.
+          if (!queueObjectIdentify())
+          {
+            Serial.println("Failed to queue object identify");
           }
       }
 

@@ -21,4 +21,6 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length);
 boolean checkMQTTState();
 unsigned long getMQTTUptime();
 
+extern char reporterTopic[30];
+
 #endif // MQTTCOMMS_H

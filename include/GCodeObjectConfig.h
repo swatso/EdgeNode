@@ -6,12 +6,11 @@ struct Pose {
   float x;
   float y;
   float heading;
-  int forward;
 };
 
 constexpr uint8_t kObjectCount = 16;  //0..15 = selectable Objects
 
-const Pose kDefaultObjectPose = {0.0F, 0.0F, 90.0F, 1};
+const Pose kDefaultObjectPose = {0.0F, 0.0F, 90.0F};
 
 const char* const kInitGCode[] = {
     "G21",      // mm units

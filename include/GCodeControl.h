@@ -20,7 +20,7 @@ public:
   char rfidTag[20];              // RFID tag associated with this object
   boolean isLoaded;              // flag to indicate if the pose data is loaded and valid
 
-    GCodeObject() : pose{0, 0, 90, 1}, isLoaded(false) {
+    GCodeObject() : pose{0, 0, 90}, isLoaded(false) {
         name[0] = '\0';
         rfidTag[0] = '\0';
     }
@@ -47,5 +47,5 @@ public:
 extern GCodeObject gcodeObjects[kObjectCount]; // Array to hold up to 16 GCode objects
 extern Pose objectPoses[kObjectCount];
 extern int currentObjectIndex;
-
+extern void loadGCodeObject(int index);
 #endif // GCODECONTROL_H

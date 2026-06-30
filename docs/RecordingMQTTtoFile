@@ -1,0 +1,17 @@
+The Marlin Interface publishes a copy of all GCode commands which it sends to the MQTT Topic:
+
+track/reporter/nn00
+
+where nn is the NodeID
+
+There is a Python Application called mqtt_recorder which makes it simple to subscribe to
+this topic and store the GCode data in a CSV file. This is one way to record an object Path
+for later editing and deployment
+
+The mqtt_recorder is available and documented Application
+https://deepwiki.com/rpdswtk/mqtt_recorder/1-overview
+
+A typical command line is
+
+mqtt-recorder --host 192.168.0.2 --mode record --file pathLog.csv --topic "track/reporter/2800"
+

@@ -1,0 +1,427 @@
+ <!DOCTYPE html> 
+  <html>
+  	<head>
+	  	<meta name="viewport" content="width=device-width, initial-scale=1">
+  		<title>Object Status</title>
+  		<link rel="shortcut icon" href="/favicon">
+  		<style>
+			left-align {text-align: left;}
+  		    meta {content:"width=device-width, initial-scale=1"}
+  			html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: left;}
+  			body{margin-top: 50px;} h1 {color: #444444;margin: auto 30px;text-align: center;} h3 {color: #444444;margin-bottom: 20px;}
+  			p {font-size: 14px;color: black;margin-bottom: 10px;}
+			table {border: 1px solid black;border-collapse: collapse;}
+			th, td {text-align: left;padding: 8px;}
+			tr:nth-child(odd) {background-color: #D6EEEE;}
+			td {border-bottom: 1px solid #444444;}
+			.radio-group {display: grid; grid-template-columns: auto 1fr; gap: 10px;align-items: left;}
+  		</style>
+  		<script>
+			var selectedObject = -1;
+
+			async function init()
+			{
+				await getSelectedObject();
+				loadAllObjects();
+
+				setInterval(async function()
+				{
+					var currentObject = selectedObject;
+					await getSelectedObject();
+					if(currentObject != selectedObject)
+					{
+						await loadAllObjects();
+					}
+					else if(selectedObject >= 0)
+					{
+						await getObjectStatus(selectedObject);
+					}
+				}, 5000);
+			}
+
+			async function loadAllObjects()
+			{
+			    for(var i=0;i<16;i++)
+                {   
+                    await getObjectStatus(i);
+				}
+			}
+
+
+			async function postit(url, content)
+  			{
+				console.log("postit " + url);
+  			   const response = await fetch(url, 
+			   {
+
+    			      method: "POST",
+    			         //body: JSON.stringify(content),
+    			         body: content,
+    			      headers: 
+    			      	 {"Content-type": "application/json; charset=UTF-8"}
+  			    });
+			}
+	  		
+
+			async function getObjectStatus(index) 
+			{
+              //console.log("getObjectStatus for index: " + index);
+
+			  document.getElementById('name'+index).innerText = "Loading...";
+			  document.getElementById('poseX' + index).innerText = "...";
+              document.getElementById('poseY' + index).innerText = "...";
+              document.getElementById('poseBrg' + index).innerText = "...";
+   			  var response = await fetch("//"+window.location.host+"/api/object/status/index?index="+index);
+			  var data = await response.json();
+			  var resp = JSON.parse(JSON.stringify(data));
+			  if(index == selectedObject)
+			  {
+				  document.getElementById('index'+ index).innerText = index + "*";
+			  }
+			  else
+			  {
+				  document.getElementById('index'+index).innerText = index;
+			  }	
+			  document.getElementById('name'+index).innerText = resp.name;
+              document.getElementById('poseX'+index).innerText = resp.poseX;
+              document.getElementById('poseY'+index).innerText = resp.poseY;
+              document.getElementById('poseBrg'+index).innerText = resp.poseBrg;
+			};
+
+			async function launchSelect(index)
+			{
+				//console.log("launchSelect for index: " + index);
+				var url = "//"+window.location.host+"/api/object/select";
+				var out = '{"index":' +  index + ' }';
+				await postit(url, out);
+				await delay(1000);
+				await getObjectStatus(index);
+			};
+
+			async function launchRemove(index)
+			{
+				console.log("launchRemove for index: " + index);
+				var url = "//"+window.location.host+"/api/object/remove";
+				var out = '{"index":' +  index + ' }';
+				await postit(url, out);
+				await delay(1000);
+				await getObjectStatus(index);
+			};
+
+			async function launchReload(index)
+			{
+				console.log("launchReload for index: " + index);
+				var url = "//"+window.location.host+"/api/object/reload";
+				var out = '{"index":' +  index + ' }';
+				await postit(url, out);
+				await delay(1000);
+				await getObjectStatus(index);
+			};
+
+			async function launchIdentify()
+			{
+				console.log("launchIdentify");
+				var url = "//"+window.location.host+"/api/object/identify";
+				var out = '{}';
+				await postit(url, out);
+			};
+
+			async function getSelectedObject()
+			{
+				console.log("getSelectedObject");
+				var response = await fetch("//"+window.location.host+"/api/object/selected");
+				var data = await response.json();
+				var resp = JSON.parse(JSON.stringify(data));
+				selectedObject = resp.index;
+				console.log("selectedObject: " + selectedObject);
+			};
+
+			function delay(milliseconds)
+			{
+ 			   return new Promise(resolve => {setTimeout(resolve, milliseconds);});
+			}	
+	</script>
+  	</head>
+  	<body onload = "init()">
+		
+  		<h1><p font-size: 30 px;text-align: "centre";color: #444444; id="header";></p>Object Status</h1>
+  		</br>
+		<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>
+			<tr>
+                <td width="10%"><p  id="index0"; value="..."></p></td>
+				<td width="20%"><p  id="name0"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX0"; value="..."></p></td>
+				<td width="10%"><p  id="poseY0"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg0"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('0')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('0')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('0')">ReLoad</button></td>
+			</tr>
+			<tr>
+                <td width="10%"><p  id="index1"; value="..."></p></td>
+				<td width="20%"><p  id="name1"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX1"; value="..."></p></td>
+				<td width="10%"><p  id="poseY1"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg1"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('1')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('1')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('1')">ReLoad</button></td>
+			</tr>
+			<tr>
+                <td width="10%"><p  id="index2"; value="..."></p></td>
+				<td width="20%"><p  id="name2"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX2"; value="..."></p></td>
+				<td width="10%"><p  id="poseY2"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg2"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('2')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('2')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('2')">ReLoad</button></td>
+			</tr>
+			<tr>
+                <td width="10%"><p  id="index3"; value="..."></p></td>
+				<td width="20%"><p  id="name3"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX3"; value="..."></p></td>
+				<td width="10%"><p  id="poseY3"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg3"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('3')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('3')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('3')">ReLoad</button></td>
+			</tr>
+			<tr>
+                <td width="10%"><p  id="index4"; value="..."></p></td>
+				<td width="20%"><p  id="name4"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX4"; value="..."></p></td>
+				<td width="10%"><p  id="poseY4"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg4"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('4')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('4')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('4')">ReLoad</button></td>
+			</tr>
+				<tr>
+                <td width="10%"><p  id="index5"; value="..."></p></td>
+				<td width="20%"><p  id="name5"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX5"; value="..."></p></td>
+				<td width="10%"><p  id="poseY5"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg5"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('5')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('5')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('5')">ReLoad</button></td>
+			</tr>
+			<tr>
+                <td width="10%"><p  id="index6"; value="..."></p></td>
+				<td width="20%"><p  id="name6"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX6"; value="..."></p></td>
+				<td width="10%"><p  id="poseY6"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg6"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('6')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('6')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('6')">ReLoad</button></td>
+			</tr>
+				<tr>
+                <td width="10%"><p  id="index7"; value="..."></p></td>
+				<td width="20%"><p  id="name7"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX7"; value="..."></p></td>
+				<td width="10%"><p  id="poseY7"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg7"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('7')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('7')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('7')">ReLoad</button></td>
+			</tr>
+			<tr>
+                <td width="10%"><p  id="index8"; value="..."></p></td>
+				<td width="20%"><p  id="name8"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX8"; value="..."></p></td>
+				<td width="10%"><p  id="poseY8"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg8"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('8')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('8')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('8')">ReLoad</button></td>
+			</tr>
+			<tr>
+                <td width="10%"><p  id="index9"; value="..."></p></td>
+				<td width="20%"><p  id="name9"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX9"; value="..."></p></td>
+				<td width="10%"><p  id="poseY9"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg9"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('9')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('9')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('9')">ReLoad</button></td>
+			</tr>
+			<tr>
+                <td width="10%"><p  id="index10"; value="..."></p></td>
+				<td width="20%"><p  id="name10"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX10"; value="..."></p></td>
+				<td width="10%"><p  id="poseY10"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg10"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('10')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('10')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('10')">ReLoad</button></td>
+			</tr>
+			<tr>
+                <td width="10%"><p  id="index11"; value="..."></p></td>
+				<td width="20%"><p  id="name11"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX11"; value="..."></p></td>
+				<td width="10%"><p  id="poseY11"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg11"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('11')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('11')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('11')">ReLoad</button></td>
+			</tr>
+			<tr>
+                <td width="10%"><p  id="index12"; value="..."></p></td>
+				<td width="20%"><p  id="name12"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX12"; value="..."></p></td>
+				<td width="10%"><p  id="poseY12"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg12"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('12')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('12')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('12')">ReLoad</button></td>
+			</tr>
+			<tr>
+                <td width="10%"><p  id="index13"; value="..."></p></td>
+				<td width="20%"><p  id="name13"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX13"; value="..."></p></td>
+				<td width="10%"><p  id="poseY13"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg13"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('13')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('13')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('13')">ReLoad</button></td>
+			</tr>
+			<tr>
+                <td width="10%"><p  id="index14"; value="..."></p></td>
+				<td width="20%"><p  id="name14"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX14"; value="..."></p></td>
+				<td width="10%"><p  id="poseY14"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg14"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('14')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('14')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('14')">ReLoad</button></td>
+			</tr>
+			<tr>
+                <td width="10%"><p  id="index15"; value="..."></p></td>
+				<td width="20%"><p  id="name15"; value="-Loading"></p></td>
+				<td width="10%"><p  id="poseX15"; value="..."></p></td>
+				<td width="10%"><p  id="poseY15"; value="..."></p></td>
+				<td width="10%"><p  id="poseBrg15"; value="..."></p></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchSelect('15')">Select</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchRemove('15')">Remove</button></td>
+				<td width="20%">
+					<button type="button" style="height:25px;width:80px;font-size:10px" 
+					onclick="launchReload('15')">ReLoad</button></td>
+			</tr>
+		</table>
+	</br></br>
+	Identify using RFID Tag and load to Start Of Day pose  <button type="button" style="height:25px;width:80px;font-size:10px" 
+	onclick="launchIdentify()">Identify</button>
+	</br></br>
+	<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>
+		<tr>
+			<td style="width:20%"><a href='/page/node'>node</a></td>
+			<td style="width:20%"><a href='/page/gpio'>gpio</a></td>
+			<td style="width:20%"><a href='/page/action'>action</a></td>
+			<td style="width:20%"><a href='/page/sound'>sound</a></td>
+			<td style="width:20%"><a href='/page/objects'>objects</a></td>
+		</tr>
+	</table>
+  	</body>
+</html>
+  
+  
+  
+  
+  
+  

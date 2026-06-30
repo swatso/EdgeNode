@@ -169,7 +169,6 @@ bool buildAbsoluteG1FromRelative(const char* payload, char* output, size_t outpu
   objectPoses[currentObjectIndex].y = absY;
   objectPoses[currentObjectIndex].heading = absZ;
   gcodeObjects[currentObjectIndex].loadPose(absX, absY, absZ);
-  gcodeObjects[currentObjectIndex].pose.forward = objectPoses[currentObjectIndex].forward;
 
   Serial.printf("(MQTTcallback) Pose update old:(%.3f, %.3f, %.3f) rel:(%.3f, %.3f, %.3f) new:(%.3f, %.3f, %.3f) feed:%s\n",
                 oldX,

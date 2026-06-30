@@ -21,16 +21,19 @@ void setup()
   delay(2000);
   setupSPIFFS();
   node.loadConfig();
+  setupMQTTPaths();
+  setupWiFi();
+  setupMQTTServices();
+  setupMQTTComms();
   setupUserCode();
   mp3.loadConfig();
   setupAction();
   loadActionConfig();
   setupGPIO();
   loadServoPositions();
-  setupWiFi();
-  setupMQTTPaths();
-  setupMQTTServices();
-  setupMQTTComms();
+  //setupWiFi();
+  //setupMQTTServices();
+  //setupMQTTComms();
   setupSound();
   powerGPIO(true);
 

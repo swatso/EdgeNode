@@ -88,11 +88,6 @@ class MarlinHandshake {
       }
       ++okResponsesPending_;
     }
-
-//    if (debugStream_ != nullptr) {
-//      debugStream_->print("Marlin: ");
-//      debugStream_->println(line);
-//    }
   }
 
   HardwareSerial& cncSerial_;
