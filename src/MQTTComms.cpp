@@ -15,12 +15,11 @@
 //    checkMQTTState()      -true = client connected
 //    getMQTTUptime()       -connection uptime in minutes
 
-// everything then runs on a ticker
+// everything then runs on a background task
 //
 
 #include <string>
 #include <cstring>
-#include <Ticker.h>
 #include <PubSubClient.h>         // MQTT library
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>                    		
@@ -33,8 +32,6 @@
 #include "sound.h"
 #include "action.h"
 #include "GCodeControl.h"
-
-Ticker runMQTT;
 
 long MQTTConnectionTime;
 
@@ -65,8 +62,27 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 TaskHandle_t MQTTSensorService;
 TaskHandle_t MQTTMessageService;
+TaskHandle_t MQTTServiceHandle;
 
 namespace {
+constexpr float kPoseMinX = 0.0F;
+constexpr float kPoseMaxX = 265.0F;
+constexpr float kPoseMinY = 0.0F;
+constexpr float kPoseMaxY = 225.0F;
+
+float clampf(float value, float minValue, float maxValue)
+{
+  if (value < minValue)
+  {
+    return minValue;
+  }
+  if (value > maxValue)
+  {
+    return maxValue;
+  }
+  return value;
+}
+
 bool buildAbsoluteG1FromRelative(const char* payload, char* output, size_t outputSize)
 {
   if ((payload == nullptr) || (output == nullptr) || (outputSize == 0))
@@ -156,6 +172,9 @@ bool buildAbsoluteG1FromRelative(const char* payload, char* output, size_t outpu
     absZ += relZ;
   }
 
+  absX = clampf(absX, kPoseMinX, kPoseMaxX);
+  absY = clampf(absY, kPoseMinY, kPoseMaxY);
+
   if (feedToken[0] != '\0')
   {
     snprintf(output, outputSize, "G1 X%.3f Y%.3f Z%.3f %s", absX, absY, absZ, feedToken);
@@ -186,6 +205,17 @@ bool buildAbsoluteG1FromRelative(const char* payload, char* output, size_t outpu
 }
 }
 
+void mqttServiceTask(void* pvParameters)
+{
+  (void)pvParameters;
+
+  for (;;)
+  {
+    serviceConnection();
+    vTaskDelay(pdMS_TO_TICKS(500));
+  }
+}
+
 void setupMQTTComms() 
 {
   Serial.println("(setupMQTTComms)");
@@ -194,9 +224,9 @@ void setupMQTTComms()
   client.setServer(node.brokerIP, 1883);
   client.setCallback(MQTTcallback);
   xTaskCreatePinnedToCore(sensorReceiverTask, "Sensor Task", 2048, NULL, 1, &MQTTSensorService, 1);
-  xTaskCreatePinnedToCore(messageReceiverTask, "Message Task", 2048, NULL, 1, &MQTTMessageService, 1);
+  xTaskCreatePinnedToCore(messageReceiverTask, "Message Task", 3072, NULL, 1, &MQTTMessageService, 1);
   connectMQTTClient();
-  runMQTT.attach_ms(500, serviceConnection);
+  xTaskCreatePinnedToCore(mqttServiceTask, "MQTT Service", 3072, NULL, 1, &MQTTServiceHandle, 1);
 }
 
 boolean connectMQTTClient() 
@@ -520,7 +550,7 @@ void messageReceiverTask(void *pvParameters)
     // Wait indefinitely for data
     if (xQueueReceive(MQTTMessageQueue, &receivedMessage, portMAX_DELAY) == pdPASS) 
     {
-      Serial.printf("[Message] Received value: %s\n", receivedMessage.message);
+      //Serial.printf("[Message] Received value: %s\n", receivedMessage.message);
       publishMQTT(receivedMessage.topic, receivedMessage.message);
       vTaskDelay(100 / portTICK_PERIOD_MS); 
     }

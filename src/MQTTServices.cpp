@@ -17,7 +17,7 @@ void setupMQTTServices()
   }else Serial.println("created sensor queue");
   // Create a Message Publish queue
   
-  MQTTMessageQueue = xQueueCreate(10, MQTT_MESSAGE_BUFFER_SIZE);
+  MQTTMessageQueue = xQueueCreate(10, sizeof(MQTTMessagePayload));
   if (MQTTMessageQueue == NULL) 
   {
     Serial.println("Error creating the message queue");

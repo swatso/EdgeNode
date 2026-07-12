@@ -18,7 +18,7 @@ void setup()
 {
   Serial.begin(115200);           // for debug only
   powerGPIO(false);
-  delay(2000);
+  delay(5000);
   setupSPIFFS();
   node.loadConfig();
   setupMQTTPaths();

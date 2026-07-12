@@ -17,7 +17,8 @@
 			.radio-group {display: grid; grid-template-columns: auto 1fr; gap: 10px;align-items: left;}
   		</style>
 
-  		<script>
+		<script src="/common.js"></script>
+		<script>
 			var track;
 
 			async function init()
@@ -36,18 +37,6 @@ console.log("init");
 				type.addEventListener('change', typeChanged);});
 			}
 
-			async function postit(url, content)
-  			{
-  			   const response = await fetch(url, 
-			   {
-    			      method: "POST",
-    			         //body: JSON.stringify(content),
-    			         body: content,
-    			      headers: 
-    			      	 {"Content-type": "application/json; charset=UTF-8"}
-  			    });
-			}
-	  		
 			async function postSoundTrackConfig() 
 			{
 			   var enableRemote = document.getElementById('enableRemote');
@@ -56,24 +45,22 @@ console.log("init");
 			   var name = document.getElementById('Name');
 			   var duration = document.getElementById('Duration');
 
-  			   var url = "//"+window.location.host+"/api/soundtrack/config";
-
-              		   var out = '{"trackNo":' + track + ',';
-			   		   out = out + '"name":"' + name.value + '",';
-					   out = out + '"volume":' + volume.value + ',';
-              		   out = out + '"duration":' + duration.value + ',';
-              		   out = out + '"enableRemote":' + enableRemote.checked + ',';
-              		   out = out + '"enableLocal":' + enableLocal.checked + '}';
+	             	   var out = {
+	             	     trackNo: Number(track),
+	             	     name: name.value,
+	             	     volume: Number(volume.value),
+	             	     duration: Number(duration.value),
+	             	     enableRemote: enableRemote.checked,
+	             	     enableLocal: enableLocal.checked
+	             	   };
 console.log(out);
- 			   postit(url,out);
+	 		   postJson("/api/soundtrack/config", out);
 			};
 
 			async function getConfig(trackNo) 
 			{
 console.log("getConfig");
-  			  var response = await fetch("//"+window.location.host+"/api/soundTrack/status?track="+trackNo);
-			  var data = await response.json();
-			  var resp = JSON.parse(JSON.stringify(data));
+			  var resp = await getJson("/api/soundTrack/status?trackno=" + trackNo);
 			  ele = document.getElementById('Name');	
 	  		  ele.value = resp.name;
 

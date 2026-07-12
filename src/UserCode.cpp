@@ -102,19 +102,19 @@ void setupUserCode()
     action[1].setActionPlayFunction(action1PlayFcn);
     action[1].setActionStopFunction(action1StopFcn);
 
-    strcpy(action[2].name, "GCode RFID1 Send");
+    strcpy(action[2].name, "path14.0");
     action[2].setActionPlayFunction(action2PlayFcn);
     action[2].setActionStopFunction(action2StopFcn);
 
-    strcpy(action[3].name, "GCode RFID2 Send");
+    strcpy(action[3].name, "path14.1");
     action[3].setActionPlayFunction(action3PlayFcn);
     action[3].setActionStopFunction(action3StopFcn);
 
-    strcpy(action[4].name, "GCode RFID3 Send");
+    strcpy(action[4].name, "path15.0");
     action[4].setActionPlayFunction(action4PlayFcn);
     action[4].setActionStopFunction(action4StopFcn);
 
-    strcpy(action[5].name, "GCode List Send");
+    strcpy(action[5].name, "path15.1");
     action[5].setActionPlayFunction(action5PlayFcn);
     action[5].setActionStopFunction(action5StopFcn);
 
@@ -122,7 +122,7 @@ void setupUserCode()
     action[6].setActionPlayFunction(action6PlayFcn);
     action[6].setActionStopFunction(action6StopFcn);
 
-    strcpy(action[7].name, "play sOD3.Gcode");
+    strcpy(action[7].name, "play Scene1");
     action[7].setActionPlayFunction(action7PlayFcn);
     action[7].setActionStopFunction(action7StopFcn);
 
@@ -251,7 +251,7 @@ int action1StopFcn(uint8_t number)
 int action2PlayFcn(uint8_t number)
 {
   (void)number;
-  const char* gcodeFilePath = "/pathRFID1.gcode";
+  const char* gcodeFilePath = "/Path14.0.gcode";
 
   if (!sendGCodeFile(gcodeFilePath))
   {
@@ -272,7 +272,7 @@ int action2StopFcn(uint8_t number)
 int action3PlayFcn(uint8_t number)
 {
   (void)number;
-  const char* gcodeFilePath = "/pathRFID2.gcode";
+  const char* gcodeFilePath = "/Path14.1.gcode";
 
   if (!sendGCodeFile(gcodeFilePath))
   {
@@ -293,7 +293,7 @@ int action3StopFcn(uint8_t number)
 int action4PlayFcn(uint8_t number)
 {
   (void)number;
-  const char* gcodeFilePath = "/pathRFID3.gcode";
+  const char* gcodeFilePath = "/Path15.0.gcode";
 
   if (!sendGCodeFile(gcodeFilePath))
   {
@@ -314,15 +314,15 @@ int action4StopFcn(uint8_t number)
 int action5PlayFcn(uint8_t number)
 {
   (void)number;
-  const char* gcodeListPath = "/joblist.txt";
+  const char* gcodeFilePath = "/Path15.1.gcode";
 
-  if (!sendGCodeFileList(gcodeListPath))
+  if (!sendGCodeFile(gcodeFilePath)) // send in reverse
   {
-    localDebug.println("Action 5 completed with errors from list: " + String(gcodeListPath));
+    localDebug.println("Action 5 failed to send G-code file: " + String(gcodeFilePath));
     return(0);
   }
 
-  localDebug.println("Action 5 sent all files from list: " + String(gcodeListPath));
+  localDebug.println("Action 5 sent G-code file: " + String(gcodeFilePath));
   return(0);
 }
 
@@ -350,15 +350,15 @@ int action6StopFcn(uint8_t number)
 int action7PlayFcn(uint8_t number)
 {
   (void)number;
-  const char* gcodeFilePath = "/startOfDay3.gcode";
+  const char* filePath = "/scene1.txt";
 
-  if (!sendGCodeFile(gcodeFilePath))
+  if (! sendGCodeFileList(filePath))
   {
-    localDebug.println("Action 7 failed to send G-code file: " + String(gcodeFilePath));
+    localDebug.println("Action 7 failed to send list: " + String(filePath));
     return(0);
   }
-
-  localDebug.println("Action 7 sent G-code file: " + String(gcodeFilePath));
+  
+  localDebug.println("Action 7 sent list: " + String(filePath));
   return(0);
 }
 

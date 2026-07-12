@@ -6,7 +6,7 @@
 
 void initGCodeControl(uint32_t baud = 250000, int8_t rxPin = 22, int8_t txPin = 23);
 void MarlinSender(const char* line);
-bool sendGCodeFile(const char* filePath);
+bool sendGCodeFile(const char* filePath, bool reverse = false);
 bool sendGCodeFileList(const char* listFilePath);
 void GCodeObjectRFIDReporter(const char* rfidTag);
 void loadGCodeObject();
@@ -16,11 +16,12 @@ class GCodeObject
 {
 public:
   Pose pose;                     // Pose of the object in the world
-      char name[20];                 // friendly name for this object
+    char name[20];                 // friendly name for this object
   char rfidTag[20];              // RFID tag associated with this object
+    uint8_t collisionRadius;       // Collision radius in arbitrary units (0..100)
   boolean isLoaded;              // flag to indicate if the pose data is loaded and valid
 
-    GCodeObject() : pose{0, 0, 90}, isLoaded(false) {
+        GCodeObject() : pose{0, 0, 90}, collisionRadius(0), isLoaded(false) {
         name[0] = '\0';
         rfidTag[0] = '\0';
     }
@@ -40,6 +41,10 @@ public:
     void setRFIDTag(const char* newRFIDTag) {
         strncpy(rfidTag, newRFIDTag, sizeof(rfidTag) - 1);
         rfidTag[sizeof(rfidTag) - 1] = '\0'; // Ensure null-termination
+    }
+
+    void setCollisionRadius(uint8_t newCollisionRadius) {
+        collisionRadius = (newCollisionRadius > 100U) ? 100U : newCollisionRadius;
     }
 
 };

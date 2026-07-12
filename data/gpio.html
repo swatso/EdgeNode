@@ -1,796 +1,320 @@
-  <!DOCTYPE html> 
-  <html>
-  	<head>
-	  	<meta name="viewport" content="width=device-width, initial-scale=1">
-  		<title>GPIO Status</title>
-  		<link rel="shortcut icon" href="/favicon">
-  		<style>
-			left-align {text-align: left;}
-  		    meta {content:"width=device-width, initial-scale=1"}
-  			html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: left;}
-  			body{margin-top: 50px;} h1 {color: #444444;margin: auto 30px;text-align: center;} h3 {color: #444444;margin-bottom: 20px;}
-  			p {font-size: 14px;color: black;margin-bottom: 10px;}
-			table {border: 1px solid black;border-collapse: collapse;}
-			th, td {text-align: left;padding: 8px;}
-			tr:nth-child(odd) {background-color: #D6EEEE;}
-			td {border-bottom: 1px solid #444444;}
-			.radio-group {display: grid; grid-template-columns: auto 1fr; gap: 10px;align-items: left;}
-  		</style>
-  		<script>
-			const name = [];
-			var type = [];
-			var preset0 = [];
-  	  		var preset1	= [];
-  	  		var preset2 = [];
-			var rate = [];
-			var easingType = [];
-			var publishRate = [];
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GPIO Status</title>
+    <link rel="shortcut icon" href="/favicon" />
+    <style>
+      html {
+        font-family: Helvetica;
+        display: inline-block;
+        margin: 0 auto;
+        text-align: left;
+      }
 
-			async function init()
-			{
-				var gpioPresets;
-				for(var i=0;i<16;i++)
-				{
-					await getGPIOConfig(i);
-					gpioPresets = document.querySelectorAll('input[name="preset3'+i+'"]');
-					gpioPresets.forEach(preset => {preset.addEventListener('change', presetChanged);});
-					gpioPresets = document.querySelectorAll('input[name="preset2'+i+'"]');
-					gpioPresets.forEach(preset => {preset.addEventListener('change', presetChanged);});
-				}
-				const gpioDemands = document.querySelectorAll('input[name="demand"]');
-				gpioDemands.forEach(demand => {demand.addEventListener('change', demandChanged);});
+      body {
+        margin-top: 50px;
+      }
 
-				const checkbox = document.querySelectorAll('input[type="checkbox"]');
-				checkbox.forEach(cb => {cb.addEventListener('change', checkboxChanged);});
-			}
+      h1 {
+        color: #444444;
+        margin: auto 30px;
+        text-align: center;
+      }
 
-			async function postit(url, content)
-  			{
-				console.log("postit " + url);
-  			   const response = await fetch(url, 
-			   {
+      p {
+        font-size: 14px;
+        color: black;
+        margin-bottom: 10px;
+      }
 
-    			      method: "POST",
-    			         //body: JSON.stringify(content),
-    			         body: content,
-    			      headers: 
-    			      	 {"Content-type": "application/json; charset=UTF-8"}
-  			    });
-			}
-	  		
-			async function checkboxChanged()
-			{
-				console.log("changed");
-				var bit = this.id.slice(-2);
-console.log("checkbox changed, bit: " + bit);
-				postGPIOConfig(bit)
-			}
+      table {
+        border: 1px solid black;
+        border-collapse: collapse;
+      }
 
-			async function presetChanged()
-			{
-				var value;
-console.log("preset changed");
-console.log(this)
-				var bit = this.id.slice(-2);
-console.log("bit:"+bit);
-				if((type[bit] == 3)||(type[bit] == 4))
-				{
-					// Servo
-		    		if(this.value == 0)value = preset0[bit];
-		    		if(this.value == 1)value = preset1[bit];
-					if(this.value == 2)value = preset2[bit];
-				}
-				else
-				{
-					// All other types have on off via 2 postion radio selector
-					value = this.value;
-				}	
-console.log(value);
-		   		var url = "//"+window.location.host+"/api/gpio/value/bit?bitno="+bit;
-           		var out = '{"value":' +  value + ',';
-				out = out + '"bitNo":' + bit + ' }';
-console.log(out);
-				postit(url,out);
-				await delay(500);
-				getGPIOConfig(bit);
-			}
+      th,
+      td {
+        text-align: left;
+        padding: 8px;
+        border-bottom: 1px solid #444444;
+      }
 
-			async function demandChanged()
-			{
-				var bit = this.id.slice(-2);
-				console.log("demand changed, bit: " + bit);
-				console.log("bit type: " + typeof bit);
-				console.log("bit.number" + Number(bit));
+      tr:nth-child(odd) {
+        background-color: #d6eeee;
+      }
 
-				if (typeof bit === "number")bit = bit*10+this.id.slice(-1);
-				console.log("demand changed");
-				console.log("bit "+bit);
-				console.log("value"+this.value);
+      .radio-group {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 10px;
+        align-items: left;
+      }
 
-				var url = "//"+window.location.host+"/api/gpio/value/bit?bitno="+bit;
-            	var out = '{"value":' +  this.value + ',';
-				out = out + '"bitNo":' + bit + ' }';
-				console.log(out);
- 			    postit(url,out);
-				await delay(50);
-				getGPIOConfig(bit);
-			}
+      .error {
+        color: #b30000;
+        min-height: 1.5em;
+      }
+    </style>
+    <script src="/common.js"></script>
+    <script>
+      const GPIO_COUNT = 16;
 
-			async function postGPIOConfig(bit) 
-			{
-			   var enableRemote = document.getElementById('enableRemote'+bit);
-			   var enableLocal = document.getElementById('enableLocal'+bit);
-			   var value = document.getElementById('value'+bit);
-  			   var url = "//"+window.location.host+"/api/gpio/config/bit";
-              		   var out = '{"bitNo":' + bit + ',';
-			   out = out + '"name":"' + name[bit] + '",';
-					   //out = out + "value:" + value.value + ',';
-              		   out = out + '"type":' + type[bit] + ',';
-              		   out = out + '"preset0":' + preset0[bit] + ',';
-              		   out = out + '"preset1":' + preset1[bit] + ',';
-              		   out = out + '"preset2":' + preset2[bit] + ',';
-              		   out = out + '"rate":' + rate[bit] + ',';
-              		   out = out + '"easingType":' + easingType[bit] + ',';
-              		   out = out + '"enableRemote":' + enableRemote.checked + ',';
-              		   out = out + '"enableLocal":' + enableLocal.checked + ',';
-              		   out = out + '"publishRate":' + publishRate[bit] + '}';
-console.log(out);
- 			   postit(url,out);
-			};
+      const name = [];
+      const type = [];
+      const preset0 = [];
+      const preset1 = [];
+      const preset2 = [];
+      const rate = [];
+      const easingType = [];
+      const publishRate = [];
 
-			async function getGPIOConfig(bit) 
-			{
+      function formatBitKey(bit) {
+        return Number(bit).toString().padStart(2, "0");
+      }
 
-console.log("getGPIOConfig for bit " + bit);
-console.log("bit length: " + bit.length);
-console.log("getGPIOConfig for bit " + bit);
-console.log("bit length: " + bit.length);
-if(bit < 10)bit = '0' + bit;
-console.log("corrected bit " + bit);
-if(bit.length >2)bit = bit.slice(-2);
-console.log("corrected bit " + bit);
-			  document.getElementById('name'+bit).innerText = "Loading...";
-			  document.getElementById('type' + bit).innerText = "Loading...";
-   			  var response = await fetch("//"+window.location.host+"/api/gpio/config/bit?bitno="+bit);
-			  var data = await response.json();
-			  var resp = JSON.parse(JSON.stringify(data));
-			  document.getElementById('name'+bit).innerText = resp.name;
-			  name[bit] = resp.name;
-              var ele = document.getElementById('type' + bit);	
-			  ele.innerText = typeToText(resp.type);
-			  type[bit]=resp.type;
+      function showError(message) {
+        setPageError(message || "");
+      }
 
-			  var sel3wayViz = 0;
-			  var sel2wayViz = 0;
-			  var demandViz = 0;
-			  var blankViz = 0;
-			  if((resp.type == 0) || (resp.type == 3)|| (resp.type == 4) || (resp.type == 6))demandViz = 1;
-			  if((resp.type == 1) || (resp.type == 2) || (resp.type == 5) || (resp.type == 7) || (resp.type == 8))sel2wayViz = 1;
-			  if((resp.type == 3) || (resp.type == 4)) sel3wayViz = 1;
-			  if((resp.type == 0) || (resp.type == 6))blankViz = 1;
-			  if((resp.type == 0) || (resp.type == 6))document.getElementById('text1' + bit).textContent="Demand 0-1023";
-			  if((resp.type == 3) || (resp.type == 4))document.getElementById('text1' + bit).textContent="Demand 0-180";
-			  var ele1 = document.getElementById("inputDemand" + bit);
-			  ele1.style.visibility = demandViz ? 'visible' : 'hidden';
-			  document.getElementById('3wayBit' + bit).style.display = sel3wayViz ? 'block' : 'none';	
-			  document.getElementById('2wayBit' + bit).style.display = sel2wayViz ? 'block' : 'none';
-			  document.getElementById('blank' + bit).style.display = blankViz ? 'block' : 'none';
-			  ele = document.getElementById('preset20' + bit);
-console.log("element name: " + ele.name);
-console.log("resp.value:"+ resp.value);
-console.log("resp.preset0:"+ resp.preset0);
-	  		  ele.checked = (resp.value == 0) ? true : false;
+      async function init() {
+        renderGpioRows();
+        wireHandlers();
 
-			  ele = document.getElementById('preset21' + bit);	
-	  		  ele.checked = (resp.value == 1) ? true : false;
+        for (let i = 0; i < GPIO_COUNT; i++) {
+          await getGPIOConfig(i);
+        }
+      }
 
-			  ele = document.getElementById('preset30' + bit);			  
-	  		  ele.checked = (resp.value == resp.preset0) ? true : false;
+      function renderGpioRows() {
+        const body = document.getElementById("gpioBody");
+        const rows = [];
 
-ele = document.getElementById('preset31' + bit);		
-	  		  ele.checked = (resp.value == resp.preset1) ? true : false;
+        for (let i = 0; i < GPIO_COUNT; i++) {
+          const bit = formatBitKey(i);
+          const group2 = `preset2${i}`;
+          const group3 = `preset3${i}`;
 
-			  ele = document.getElementById('preset32' + bit);	
-	  		  ele.checked = (resp.value == resp.preset2) ? true : false;
-console.log("a");
-			  document.getElementById('text30' + bit).textContent=resp.preset0;
-			  document.getElementById('text31' + bit).textContent=resp.preset1;
-			  document.getElementById('text32' + bit).textContent=resp.preset2;
-			  ele = document.getElementById('value' + bit);	
-			  ele.innerText = "Value: " + resp.value;
-console.log("b");
-	  		  preset0[bit] = resp.preset0;
-  	  		  preset1[bit] = resp.preset1;
-  	  		  preset2[bit] = resp.preset2;
-			  rate[bit] =	resp.rate;
-			  easingType[bit] = resp.easingType;
-			  publishRate[bit] = resp.publishRate;
-console.log("d");
-			  ele = document.getElementById('enableRemote'+bit);	
-	  		  ele.checked = resp.enableRemote;
-			  ele = document.getElementById('enableLocal'+bit);	
-	  		  ele.checked = resp.enableLocal;
-			};
+          rows.push(`
+            <tr>
+              <td width="20%">GPIO:${toHex2(i)}</td>
+              <td width="20%"><span id="name${bit}">-Loading</span></td>
+              <td width="20%"><span id="type${bit}">-Loading</span></td>
+              <td width="20%"><span id="value${bit}">-Loading</span></td>
+              <td width="20%"><button type="button" onclick="launchBitCongfig(${i})">Configure</button></td>
+            </tr>
+            <tr>
+              <td width="20%"><input type="checkbox" id="enableRemote${bit}" />Enable Remote</td>
+              <td width="20%"><input type="checkbox" id="enableLocal${bit}" />Enable Local</td>
+              <td width="20%" id="inputDemand${bit}" style="visibility:hidden">
+                <div class="radio-group">
+                  <span id="text1${bit}">Loading</span>
+                  <input size="5" name="demand" type="text" id="demand${bit}" value="" />
+                </div>
+              </td>
+              <td width="20%" id="3wayBit${bit}" style="display:none">
+                <div class="radio-group">
+                  <input type="radio" name="${group3}" id="preset30${bit}" value="0" /><span id="text30${bit}">Preset1</span>
+                  <input type="radio" name="${group3}" id="preset31${bit}" value="1" /><span id="text31${bit}">Preset2</span>
+                  <input type="radio" name="${group3}" id="preset32${bit}" value="2" /><span id="text32${bit}">Preset3</span>
+                </div>
+              </td>
+              <td width="20%" id="2wayBit${bit}" style="display:none">
+                <div class="radio-group">
+                  <input type="radio" name="${group2}" id="preset20${bit}" value="0" />Off
+                  <input type="radio" name="${group2}" id="preset21${bit}" value="1" />On
+                </div>
+              </td>
+              <td width="20%" id="blank${bit}" style="display:none"></td>
+              <td width="20%"><button type="button" onclick="getGPIOConfig(${i})">Refresh</button></td>
+            </tr>
+          `);
+        }
 
-			function typeToText(type)
-			{
-				// converts a GPIO Type Number to corresponding Text
-				if(type == 1)return("GPIO_PWM");
-				if(type == 2)return("GPIO_DIGOUT");
-				if(type == 3)return("GPIO_SERVO");
-				if(type == 4)return("GPIO_SERVO_ACTUATOR");
-				if(type == 5)return("GPIO_DIGIN");
-				if(type == 6)return("GPIO_AIN");
-				if(type == 7)return("GPIO_DIGOUT_PULSE");
-				if(type == 8)return("GPIO_PWM_PULSE");
-				return("NONE");
-			};
+        body.innerHTML = rows.join("");
+      }
 
-			async function launchBitCongfig(bit)
-			{
-  			  var url = "//"+window.location.host+"/page/gpioconfig?bitno="+bit;
-				open(url);
-			};
+      function wireHandlers() {
+        for (let i = 0; i < GPIO_COUNT; i++) {
+          const bit = formatBitKey(i);
 
-			function delay(milliseconds)
-			{
- 			   return new Promise(resolve => {setTimeout(resolve, milliseconds);});
-			}	
-	</script>
-  	</head>
-  	<body onload = "init()">
-		
-  		<h1><p font-size: 30 px;text-align: "centre";color: #444444; id="header";></p>GPIO Status</h1>
-  		</br>
-		<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>
-			<tr>
-				<td width="20%">GPIO:00</td>
-				<td width="20%"><p  id="name00"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type00"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value00"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('0')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote00" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal00" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand00" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text100">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand00" value=""></div></td>
-   		    	<td width="20%" id="3wayBit00" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset30" Id="preset3000" value="0"/><span id="text3000">Preset1</span>
-    				<input type="radio" name= "preset30" Id="preset3100" value="1"/><span id="text3100">Preset2</span>
-    				<input type="radio" name= "preset30" Id="preset3200" value="2"/><span id="text3200">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit00" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset20" Id="preset2000" value="0"/>Off
-    				<input type="radio" name= "preset20" Id="preset2100" value="1"/>On</div></td>
-				<td width="20%" id="blank00" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(0)">Refresh</button></th></td>
-			</tr>
+          document.getElementById(`enableRemote${bit}`).addEventListener("change", () => postGPIOConfig(bit));
+          document.getElementById(`enableLocal${bit}`).addEventListener("change", () => postGPIOConfig(bit));
+          document.getElementById(`demand${bit}`).addEventListener("change", demandChanged);
 
-			<tr>
-				<td width="20%">GPIO:01</td>
-				<td width="20%"><p  id="name01"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type01"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value01"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('1')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote01" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal01" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand01" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text101">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand01" value=""></div></td>
-   		    	<td width="20%" id="3wayBit01" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset31" Id="preset3001" value="0"/><span id="text3001">Preset1</span>
-    				<input type="radio" name= "preset31" Id="preset3101" value="1"/><span id="text3101">Preset2</span>
-    				<input type="radio" name= "preset31" Id="preset3201" value="2"/><span id="text3201">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit01" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset21" Id="preset2001" value="0"/>Off
-    				<input type="radio" name= "preset21" Id="preset2101" value="1"/>On</div></td>
-				<td width="20%" id="blank01" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(1)">Refresh</button></th></td>
-			</tr>
+          document.getElementById(`preset20${bit}`).addEventListener("change", presetChanged);
+          document.getElementById(`preset21${bit}`).addEventListener("change", presetChanged);
+          document.getElementById(`preset30${bit}`).addEventListener("change", presetChanged);
+          document.getElementById(`preset31${bit}`).addEventListener("change", presetChanged);
+          document.getElementById(`preset32${bit}`).addEventListener("change", presetChanged);
+        }
+      }
 
-			<tr>
-				<td width="20%">GPIO:02</td>
-				<td width="20%"><p  id="name02"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type02"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value02"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('2')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote02" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal02" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand02" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text102">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand02" value=""></div></td>
-   		    	<td width="20%" id="3wayBit02" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset32" Id="preset3002" value="0"/><span id="text3002">Preset1</span>
-    				<input type="radio" name= "preset32" Id="preset3102" value="1"/><span id="text3102">Preset2</span>
-    				<input type="radio" name= "preset32" Id="preset3202" value="2"/><span id="text3202">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit02" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset22" Id="preset2002" value="0"/>Off
-    				<input type="radio" name= "preset22" Id="preset2102" value="1"/>On</div></td>
-				<td width="20%" id="blank02" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(2)">Refresh</button></th></td>
-			</tr>
+      async function presetChanged() {
+        try {
+          const bit = this.id.slice(-2);
+          let value;
 
-			<tr>
-				<td width="20%">GPIO:03</td>
-				<td width="20%"><p  id="name03"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type03"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value03"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('3')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote03" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal03" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand03" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text103">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand03" value=""></div></td>
-   		    	<td width="20%" id="3wayBit03" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset33" Id="preset3003" value="0"/><span id="text3003">Preset1</span>
-    				<input type="radio" name= "preset33" Id="preset3103" value="1"/><span id="text3103">Preset2</span>
-    				<input type="radio" name= "preset33" Id="preset3203" value="2"/><span id="text3203">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit03" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset23" Id="preset2003" value="0"/>Off
-    				<input type="radio" name= "preset23" Id="preset2103" value="1"/>On</div></td>
-				<td width="20%" id="blank03" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(3)">Refresh</button></th></td>
-			</tr>
+          if (type[bit] === 3 || type[bit] === 4) {
+            if (this.value === "0") value = preset0[bit];
+            if (this.value === "1") value = preset1[bit];
+            if (this.value === "2") value = preset2[bit];
+          } else {
+            value = Number(this.value);
+          }
 
-						<tr>
-				<td width="20%">GPIO:04</td>
-				<td width="20%"><p  id="name04"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type04"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value04"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('4')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote04" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal04" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand04" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text104">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand04" value=""></div></td>
-   		    	<td width="20%" id="3wayBit04" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset34" Id="preset3004" value="0"/><span id="text3004">Preset1</span>
-    				<input type="radio" name= "preset34" Id="preset3104" value="1"/><span id="text3104">Preset2</span>
-    				<input type="radio" name= "preset34" Id="preset3204" value="2"/><span id="text3204">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit04" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset24" Id="preset2004" value="0"/>Off
-    				<input type="radio" name= "preset24" Id="preset2104" value="1"/>On</div></td>
-				<td width="20%" id="blank04" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(4)">Refresh</button></th></td>
-			</tr>
+          await postJson("/api/gpio/value/bit", {
+            value: Number(value),
+            bitNo: Number(bit),
+          });
 
-			<tr>
-				<td width="20%">GPIO:05</td>
-				<td width="20%"><p  id="name05"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type05"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value05"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('5')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote05" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal05" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand05" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text105">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand05" value=""></div></td>
-   		    	<td width="20%" id="3wayBit05" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset35" Id="preset3005" value="0"/><span id="text3005">Preset1</span>
-    				<input type="radio" name= "preset35" Id="preset3105" value="1"/><span id="text3105">Preset2</span>
-    				<input type="radio" name= "preset35" Id="preset3205" value="2"/><span id="text3205">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit05" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset25" Id="preset2005" value="0"/>Off
-    				<input type="radio" name= "preset25" Id="preset2105" value="1"/>On</div></td>
-				<td width="20%" id="blank05" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(5)">Refresh</button></th></td>
-			</tr>
+          await delay(200);
+          await getGPIOConfig(bit);
+          showError("");
+        } catch (error) {
+          showError(`Preset update failed: ${error}`);
+        }
+      }
 
-			<tr>
-				<td width="20%">GPIO:06</td>
-				<td width="20%"><p  id="name06"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type06"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value06"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('6')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote06" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal06" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand06" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text106">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand06" value=""></div></td>
-   		    	<td width="20%" id="3wayBit06" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset36" Id="preset3006" value="0"/><span id="text3006">Preset1</span>
-    				<input type="radio" name= "preset36" Id="preset3106" value="1"/><span id="text3106">Preset2</span>
-    				<input type="radio" name= "preset36" Id="preset3206" value="2"/><span id="text3206">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit06" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset26" Id="preset2006" value="0"/>Off
-    				<input type="radio" name= "preset26" Id="preset2106" value="1"/>On</div></td>
-				<td width="20%" id="blank06" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(6)">Refresh</button></th></td>
-			</tr>
+      async function demandChanged() {
+        try {
+          const bit = this.id.slice(-2);
 
-			
+          await postJson("/api/gpio/value/bit", {
+            value: Number(this.value),
+            bitNo: Number(bit),
+          });
 
-			<tr>
-				<td width="20%">GPIO:07</td>
-				<td width="20%"><p  id="name07"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type07"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value07"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('7')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote07" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal07" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand07" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text107">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand07" value=""></div></td>
-   		    	<td width="20%" id="3wayBit07" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset37" Id="preset3007" value="0"/><span id="text3007">Preset1</span>
-    				<input type="radio" name= "preset37" Id="preset3107" value="1"/><span id="text3107">Preset2</span>
-    				<input type="radio" name= "preset37" Id="preset3207" value="2"/><span id="text3207">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit07" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset27" Id="preset2007" value="0"/>Off
-    				<input type="radio" name= "preset27" Id="preset2107" value="1"/>On</div></td>
-				<td width="20%" id="blank07" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(7)">Refresh</button></th></td>
-			</tr>
+          await delay(100);
+          await getGPIOConfig(bit);
+          showError("");
+        } catch (error) {
+          showError(`Demand update failed: ${error}`);
+        }
+      }
 
+      async function postGPIOConfig(bit) {
+        try {
+          const enableRemote = document.getElementById(`enableRemote${bit}`);
+          const enableLocal = document.getElementById(`enableLocal${bit}`);
 
-			<tr>
-				<td width="20%">GPIO:08</td>
-				<td width="20%"><p  id="name08"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type08"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value08"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('8')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote08" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal08" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand08" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text108">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand08" value=""></div></td>
-   		    	<td width="20%" id="3wayBit08" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset38" Id="preset3008" value="0"/><span id="text3008">Preset1</span>
-    				<input type="radio" name= "preset38" Id="preset3108" value="1"/><span id="text3108">Preset2</span>
-    				<input type="radio" name= "preset38" Id="preset3208" value="2"/><span id="text3208">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit08" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset28" Id="preset2008" value="0"/>Off
-    				<input type="radio" name= "preset28" Id="preset2108" value="1"/>On</div></td>
-				<td width="20%" id="blank08" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(8)">Refresh</button></th></td>
-			</tr>
+          const out = {
+            bitNo: Number(bit),
+            name: name[bit],
+            type: Number(type[bit]),
+            preset0: Number(preset0[bit]),
+            preset1: Number(preset1[bit]),
+            preset2: Number(preset2[bit]),
+            rate: Number(rate[bit]),
+            easingType: Number(easingType[bit]),
+            enableRemote: enableRemote.checked,
+            enableLocal: enableLocal.checked,
+            publishRate: Number(publishRate[bit]),
+          };
 
-			<tr>
-				<td width="20%">GPIO:09</td>
-				<td width="20%"><p  id="name09"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type09"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value09"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('09')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote09" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal09" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand09" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text109">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand09" value=""></div></td>
-   		    	<td width="20%" id="3wayBit09" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset39" Id="preset3009" value="0"/><span id="text3009">Preset1</span>
-    				<input type="radio" name= "preset39" Id="preset3109" value="1"/><span id="text3109">Preset2</span>
-    				<input type="radio" name= "preset39" Id="preset3209" value="2"/><span id="text3209">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit09" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset29" Id="preset2009" value="0"/>Off
-    				<input type="radio" name= "preset29" Id="preset2109" value="1"/>On</div></td>
-				<td width="20%" id="blank09" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(9)">Refresh</button></th></td>
-			</tr>
+          await postJson("/api/gpio/config/bit", out);
+          showError("");
+        } catch (error) {
+          showError(`GPIO config save failed: ${error}`);
+        }
+      }
 
-			<tr>
-				<td width="20%">GPIO:0A</td>
-				<td width="20%"><p  id="name10"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type10"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value10"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('10')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote10" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal10" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand10" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text110">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand10" value=""></div></td>
-   		    	<td width="20%" id="3wayBit10" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset310" Id="preset3010" value="0"/><span id="text3010">Preset1</span>
-    				<input type="radio" name= "preset310" Id="preset3110" value="1"/><span id="text3110">Preset2</span>
-    				<input type="radio" name= "preset310" Id="preset3210" value="2"/><span id="text3210">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit10" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset210" Id="preset2010" value="0"/>Off
-    				<input type="radio" name= "preset210" Id="preset2110" value="1"/>On</div></td>
-				<td width="20%" id="blank10" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(10)">Refresh</button></th></td>
-			</tr>
+      async function getGPIOConfig(bitInput) {
+        const bit = formatBitKey(bitInput);
 
-			<tr>
-				<td width="20%">GPIO:0B</td>
-				<td width="20%"><p  id="name11"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type11"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value11"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('11')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote11" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal11" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand11" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text111">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand11" value=""></div></td>
-   		    	<td width="20%" id="3wayBit11" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset311" Id="preset3011" value="0"/><span id="text3011">Preset1</span>
-    				<input type="radio" name= "preset311" Id="preset3111" value="1"/><span id="text3111">Preset2</span>
-    				<input type="radio" name= "preset311" Id="preset3211" value="2"/><span id="text3211">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit11" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset211" Id="preset2011" value="0"/>Off
-    				<input type="radio" name= "preset211" Id="preset2111" value="1"/>On</div></td>
-				<td width="20%" id="blank11" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(11)">Refresh</button></th></td>
-			</tr>
+        try {
+          document.getElementById(`name${bit}`).innerText = "Loading...";
+          document.getElementById(`type${bit}`).innerText = "Loading...";
 
-			<tr>
-				<td width="20%">GPIO:0C</td>
-				<td width="20%"><p  id="name12"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type12"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value12"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('12')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote12" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal12" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand12" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text112">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand12" value=""></div></td>
-   		    	<td width="20%" id="3wayBit12" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset312" Id="preset3012" value="0"/><span id="text3012">Preset1</span>
-    				<input type="radio" name= "preset312" Id="preset3112" value="1"/><span id="text3112">Preset2</span>
-    				<input type="radio" name= "preset312" Id="preset3212" value="2"/><span id="text3212">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit12" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset212" Id="preset2012" value="0"/>Off
-    				<input type="radio" name= "preset212" Id="preset2112" value="1"/>On</div></td>
-				<td width="20%" id="blank12" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(12)">Refresh</button></th></td>
-			</tr>
+          const resp = await getJson(`/api/gpio/config/bit?bitno=${Number(bit)}`);
 
-			<tr>
-				<td width="20%">GPIO:0D</td>
-				<td width="20%"><p  id="name13"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type13"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value13"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('13')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote13" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal13" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand13" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text113">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand13" value=""></div></td>
-   		    	<td width="20%" id="3wayBit13" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset313" Id="preset3013" value="0"/><span id="text3013">Preset1</span>
-    				<input type="radio" name= "preset313" Id="preset3113" value="1"/><span id="text3113">Preset2</span>
-    				<input type="radio" name= "preset313" Id="preset3213" value="2"/><span id="text3213">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit13" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset213" Id="preset2013" value="0"/>Off
-    				<input type="radio" name= "preset213" Id="preset2113" value="1"/>On</div></td>
-				<td width="20%" id="blank13" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(13)">Refresh</button></th></td>
-			</tr>
+          document.getElementById(`name${bit}`).innerText = resp.name;
+          document.getElementById(`type${bit}`).innerText = typeToText(Number(resp.type));
 
-			<tr>
-				<td width="20%">GPIO:0E</td>
-				<td width="20%"><p  id="name14"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type14"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value14"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('14')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote14" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal14" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand14" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text114">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand14" value=""></div></td>
-   		    	<td width="20%" id="3wayBit14" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset314" Id="preset3014" value="0"/><span id="text3014">Preset1</span>
-    				<input type="radio" name= "preset314" Id="preset3114" value="1"/><span id="text3114">Preset2</span>
-    				<input type="radio" name= "preset314" Id="preset3214" value="2"/><span id="text3214">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit14" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset214" Id="preset2014" value="0"/>Off
-    				<input type="radio" name= "preset214" Id="preset2114" value="1"/>On</div></td>
-				<td width="20%" id="blank14" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(14)">Refresh</button></th></td>
-			</tr>
+          name[bit] = resp.name;
+          const gpioType = Number(resp.type);
+          type[bit] = gpioType;
 
-			<tr>
-				<td width="20%">GPIO:0F</td>
-				<td width="20%"><p  id="name15"; value="-Loading"></p></td>
-				<td width="20%"><p  id="type15"; value="-Loading"></p></td>
-				<td width="20%"><p  id="value15"; value="-Loading"></p></td>
-				<td width="20%">
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="launchBitCongfig('15')">Configure</button></th>
-			</tr>
-			<tr>
-				<td width="20%">
-					<input type="checkbox" id="enableRemote15" value="Option1">Enable Remote</td>
-				<td width="20%">
-					<input type="checkbox" id="enableLocal15" value="Option1">Enable Local</td>
-				<td width="20%" id="inputDemand15" style="visibility:hidden">
-					<div class="radio-group">
-					<span id="text115">Loading</span>
-					<input size="5" name="demand" type="Text" id="demand15" value=""></div></td>
-   		    	<td width="20%" id="3wayBit15" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset315" Id="preset3015" value="0"/><span id="text3015">Preset1</span>
-    				<input type="radio" name= "preset315" Id="preset3115" value="1"/><span id="text3115">Preset2</span>
-    				<input type="radio" name= "preset315" Id="preset3215" value="2"/><span id="text3215">Preset3</span></div></td>
-   		    	<td width="20%" id="2wayBit15" style="display:none">
-					<div class="radio-group">
-    				<input type="radio" name= "preset215" Id="preset2015" value="0"/>Off
-    				<input type="radio" name= "preset215" Id="preset2115" value="1"/>On</div></td>
-				<td width="20%" id="blank15" style="display:none"></td>
-				<td width="20%"> 
-					<button type="button" style="height:25px;width:80px;font-size:10px" 
-					onclick="getGPIOConfig(15)">Refresh</button></th></td>
-			</tr>
+          const showDemand = gpioType === 0 || gpioType === 3 || gpioType === 4 || gpioType === 6;
+          const showTwoWay = gpioType === 1 || gpioType === 2 || gpioType === 5 || gpioType === 7 || gpioType === 8;
+          const showThreeWay = gpioType === 3 || gpioType === 4;
+          const showBlank = gpioType === 0 || gpioType === 6;
 
-		</table>
-	</br></br>
+          document.getElementById(`text1${bit}`).textContent = showThreeWay ? "Demand 0-180" : "Demand 0-1023";
+          document.getElementById(`inputDemand${bit}`).style.visibility = showDemand ? "visible" : "hidden";
+          document.getElementById(`3wayBit${bit}`).style.display = showThreeWay ? "block" : "none";
+          document.getElementById(`2wayBit${bit}`).style.display = showTwoWay ? "block" : "none";
+          document.getElementById(`blank${bit}`).style.display = showBlank ? "block" : "none";
 
-	<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>
-		<tr>
-			<td style="width:20%"><a href='/page/node'>node</a></td>
-			<td style="width:20%"><a href='/page/gpio'>gpio</a></td>
-			<td style="width:20%"><a href='/page/action'>action</a></td>
-			<td style="width:20%"><a href='/page/sound'>sound</a></td>
-			<td style="width:20%"><a href='/page/objects'>objects</a></td>
-		</tr>
-	</table>
-  	</body>
+          document.getElementById(`preset20${bit}`).checked = Number(resp.value) === 0;
+          document.getElementById(`preset21${bit}`).checked = Number(resp.value) === 1;
+          document.getElementById(`preset30${bit}`).checked = Number(resp.value) === Number(resp.preset0);
+          document.getElementById(`preset31${bit}`).checked = Number(resp.value) === Number(resp.preset1);
+          document.getElementById(`preset32${bit}`).checked = Number(resp.value) === Number(resp.preset2);
+
+          document.getElementById(`text30${bit}`).textContent = resp.preset0;
+          document.getElementById(`text31${bit}`).textContent = resp.preset1;
+          document.getElementById(`text32${bit}`).textContent = resp.preset2;
+          document.getElementById(`value${bit}`).innerText = `Value: ${resp.value}`;
+          document.getElementById(`demand${bit}`).value = resp.value;
+
+          preset0[bit] = Number(resp.preset0);
+          preset1[bit] = Number(resp.preset1);
+          preset2[bit] = Number(resp.preset2);
+          rate[bit] = Number(resp.rate);
+          easingType[bit] = Number(resp.easingType);
+          publishRate[bit] = Number(resp.publishRate);
+
+          document.getElementById(`enableRemote${bit}`).checked = !!resp.enableRemote;
+          document.getElementById(`enableLocal${bit}`).checked = !!resp.enableLocal;
+          showError("");
+        } catch (error) {
+          showError(`Failed to load GPIO ${bit}: ${error}`);
+        }
+      }
+
+      function typeToText(gpioType) {
+        if (gpioType === 1) return "GPIO_PWM";
+        if (gpioType === 2) return "GPIO_DIGOUT";
+        if (gpioType === 3) return "GPIO_SERVO";
+        if (gpioType === 4) return "GPIO_SERVO_ACTUATOR";
+        if (gpioType === 5) return "GPIO_DIGIN";
+        if (gpioType === 6) return "GPIO_AIN";
+        if (gpioType === 7) return "GPIO_DIGOUT_PULSE";
+        if (gpioType === 8) return "GPIO_PWM_PULSE";
+        return "NONE";
+      }
+
+      function launchBitCongfig(bit) {
+        open(apiUrl(`/page/gpioconfig?bitno=${bit}`));
+      }
+
+      function delay(milliseconds) {
+        return new Promise((resolve) => {
+          setTimeout(resolve, milliseconds);
+        });
+      }
+    </script>
+  </head>
+  <body onload="init()">
+    <h1>GPIO Status</h1>
+
+    <p id="error" class="error"></p>
+
+    <table width="100%" style="outline: 5px solid #1c6ea4; outline-offset: 0px">
+      <tbody id="gpioBody"></tbody>
+    </table>
+
+    <br /><br />
+
+    <table width="100%" style="outline: 5px solid #1c6ea4; outline-offset: 0px">
+      <tr>
+        <td style="width: 20%"><a href="/page/node">node</a></td>
+        <td style="width: 20%"><a href="/page/gpio">gpio</a></td>
+        <td style="width: 20%"><a href="/page/action">action</a></td>
+        <td style="width: 20%"><a href="/page/sound">sound</a></td>
+        <td style="width: 20%"><a href="/page/objects">objects</a></td>
+      </tr>
+    </table>
+  </body>
 </html>
-  
-  
-  
-  
-  
-  

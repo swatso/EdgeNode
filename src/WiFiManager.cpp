@@ -39,6 +39,10 @@ QueueHandle_t objectSelectionQueue = nullptr;
 QueueHandle_t objectRemovalQueue = nullptr;
 QueueHandle_t objectReloadQueue = nullptr;
 QueueHandle_t objectIdentifyQueue = nullptr;
+constexpr size_t kJsonResponseBufferSize = 256;
+constexpr int kGpioCount = 16;
+constexpr int kTrackCount = 16;
+constexpr int kActionCount = 16;
 
 void objectSelectionTask(void*);
 void objectRemovalTask(void*);
@@ -94,6 +98,13 @@ void objectSelectionTask(void*)
   {
     if (xQueueReceive(objectSelectionQueue, &index, portMAX_DELAY) == pdTRUE)
     {
+      if ((index < 0) || (index >= kObjectCount))
+      {
+        Serial.print("Invalid object selection index: ");
+        Serial.println(index);
+        continue;
+      }
+
       Serial.print("select object: ");
       Serial.println(index);
       setCurrentObjectIndex(index);
@@ -120,7 +131,7 @@ void objectRemovalTask(void*)
       Serial.println(index);
       gcodeObjects[index].pose.x = 0;
       gcodeObjects[index].pose.y = 0;
-      gcodeObjects[index].pose.heading = 0;
+      gcodeObjects[index].pose.heading = 90;
     }
   }
 }
@@ -362,8 +373,7 @@ void setupWiFi()
     }
 
 //    Serial.println("initialising web server");
-    server.serveStatic("/", SPIFFS, "/");
-    
+
     // Route for /home web page
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
       //Serial.println("Serve node.html");
@@ -396,13 +406,13 @@ void setupWiFi()
 
     // Route for action web page
     server.on("/page/action", HTTP_GET, [](AsyncWebServerRequest *request) {
-      //Serial.println("Serve action.html");
+      Serial.println("Serve action.html");
       request->send(SPIFFS, "/action.html", "text/html", false);
     });
 
     // Route for action config web page
     server.on("/page/actionconfig", HTTP_GET, [](AsyncWebServerRequest *request) {
-      //Serial.println("Serve actionconfig.html");
+      Serial.println("Serve actionconfig.html");
       request->send(SPIFFS, "/actionConfig.html", "text/html", false);
     });
 
@@ -440,7 +450,7 @@ void setupWiFi()
       if (request->url() == "/api/nodeid/value") 
       {
         Serial.println("Received /api/nodeid/value GET request");
-        AsyncResponseStream *response = request->beginResponseStream("application/json");
+        AsyncResponseStream *response = request->beginResponseStream("application/json", kJsonResponseBufferSize);
         JsonDocument doc;
         doc["value"] = node.getNodeIDstring();
         serializeJson(doc,*response);  
@@ -453,7 +463,7 @@ void setupWiFi()
       if (request->url() == "/api/brokerip/value") 
       {
         //Serial.println("Received /api/brokerip/value GET request");
-        AsyncResponseStream *response = request->beginResponseStream("application/json");
+        AsyncResponseStream *response = request->beginResponseStream("application/json", kJsonResponseBufferSize);
         JsonDocument doc;
         doc["value"] = node.brokerIP;
         serializeJson(doc,*response);  
@@ -466,7 +476,7 @@ void setupWiFi()
       if (request->url() == "/api/hostname/value") 
       {
 //        Serial.println("Received /api/hostname/value GET request");
-        AsyncResponseStream *response = request->beginResponseStream("application/json");
+        AsyncResponseStream *response = request->beginResponseStream("application/json", kJsonResponseBufferSize);
         JsonDocument doc;
         doc["value"] =node.hostName;
         serializeJson(doc,*response);  
@@ -480,7 +490,7 @@ void setupWiFi()
       if (request->url() == "/api/node/status") 
       {
 //        Serial.println("Received /api/node/status GET request");
-        AsyncResponseStream *response = request->beginResponseStream("application/json");
+        AsyncResponseStream *response = request->beginResponseStream("application/json", kJsonResponseBufferSize);
         JsonDocument doc;
         doc["WIFIuptime"] = WiFiGetCommsUptime();
         doc["ipAddress"] = WiFiGetIPAddress();
@@ -497,7 +507,7 @@ void setupWiFi()
       if (request->url() == "/api/mp3Player/status") 
       {
         //Serial.println("Received /api/mp3Player/status GET request");
-        AsyncResponseStream *response = request->beginResponseStream("application/json");
+        AsyncResponseStream *response = request->beginResponseStream("application/json", kJsonResponseBufferSize);
         JsonDocument doc;
         doc["currentTrack"] = mp3.currentTrack;
         doc["currentVolume"] = mp3.currentVolume;
@@ -518,12 +528,18 @@ void setupWiFi()
         if (request->hasParam("trackno")) trackNo = strtol(request->getParam("trackno")->value().c_str(),&ptr,10);
         else trackNo = 0;
 
+        if ((trackNo < 0) || (trackNo >= kTrackCount))
+        {
+          request->send(400, "application/json", "{\"error\":\"invalid trackno\"}");
+          return;
+        }
+
 //        Serial.print("TrackNo:");
 //        Serial.println(trackNo);
 //        Serial.print("Track Name:");
 //        Serial.println(mp3.track[trackNo].name);
 
-        AsyncResponseStream *response = request->beginResponseStream("application/json");
+        AsyncResponseStream *response = request->beginResponseStream("application/json", kJsonResponseBufferSize);
         JsonDocument doc;
         doc["name"] = mp3.track[trackNo].name;
         doc["duration"] = mp3.track[trackNo].duration;
@@ -544,7 +560,13 @@ void setupWiFi()
         Serial.println("Received /api/action/config GET request");
         if (request->hasParam("number")) number = strtol(request->getParam("number")->value().c_str(),&ptr,10);
         else number = 0;
-        AsyncResponseStream *response = request->beginResponseStream("application/json");
+
+        if ((number < 0) || (number >= kActionCount))
+        {
+          request->send(400, "application/json", "{\"error\":\"invalid action number\"}");
+          return;
+        }
+
         JsonDocument doc;
         doc["name"] = action[number].name;
         doc["number"] = number;
@@ -556,8 +578,17 @@ void setupWiFi()
         doc["userVar1"] = action[number].userVar1; 
         doc["userVar2"] = action[number].userVar2;
 
-        serializeJson(doc,*response);  
-        request->send(response);
+        char responseBuffer[kJsonResponseBufferSize];
+        const size_t responseLength = serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+        if (responseLength == 0)
+        {
+          request->send(500, "application/json", "{\"error\":\"serialization failed\"}");
+          return;
+        }
+
+        request->send(200, "application/json", responseBuffer);
+        Serial.print("Sent /api/action/config response for action number: ");
+        Serial.println(number);
       }
     });
 
@@ -570,9 +601,15 @@ void setupWiFi()
         char* ptr;
         if (request->hasParam("bitno")) bit = strtol(request->getParam("bitno")->value().c_str(),&ptr,10);
         else bit = 0;
+
+        if ((bit < 0) || (bit >= kGpioCount))
+        {
+          request->send(400, "application/json", "{\"error\":\"invalid bitno\"}");
+          return;
+        }
 //        Serial.print("Received /api/gpio/config/bit GET request Bit:");
 //        Serial.println(bit);
-        AsyncResponseStream *response = request->beginResponseStream("application/json");
+        AsyncResponseStream *response = request->beginResponseStream("application/json", kJsonResponseBufferSize);
         JsonDocument doc;
         doc["bitNo"] = bit;
         doc["value"] = gpio[bit].getValue();
@@ -595,12 +632,11 @@ void setupWiFi()
 
     server.on("/api/object/selected", HTTP_GET, [](AsyncWebServerRequest *request) 
     {
-      long index;
       if (request->url() == "/api/object/selected")
       {
         //Serial.print("Received /api/object/selected GET request returning:");
         //Serial.println(currentObjectIndex);
-        AsyncResponseStream *response = request->beginResponseStream("application/json");
+        AsyncResponseStream *response = request->beginResponseStream("application/json", kJsonResponseBufferSize);
         JsonDocument doc;
         doc["index"] = currentObjectIndex;
         serializeJson(doc,*response);  
@@ -617,9 +653,15 @@ void setupWiFi()
         char* ptr;
         if (request->hasParam("index")) index = strtol(request->getParam("index")->value().c_str(),&ptr,10);
         else index = 0;
+
+        if ((index < 0) || (index >= kObjectCount))
+        {
+          request->send(400, "application/json", "{\"error\":\"invalid object index\"}");
+          return;
+        }
         //Serial.print("Received /api/object/status/index GET request index:");
         //Serial.println(index);
-        AsyncResponseStream *response = request->beginResponseStream("application/json");
+        AsyncResponseStream *response = request->beginResponseStream("application/json", kJsonResponseBufferSize);
         JsonDocument doc;
         doc["index"] = currentObjectIndex;
         doc["name"] = gcodeObjects[index].name;
@@ -929,6 +971,8 @@ void setupWiFi()
       //Serial.println("200");
       request->send(200,"application/json","OK");
     });      
+
+    server.serveStatic("/", SPIFFS, "/");
     server.begin();
   }
   else 

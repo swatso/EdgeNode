@@ -1,331 +1,365 @@
-  <!DOCTYPE html> 
-  <html>
-  	<head>
-	  	<meta name="viewport" content="width=device-width, initial-scale=1">
-  		<title>GPIO Configuration</title>
-  		<link rel="shortcut icon" href="/favicon">
-  		<style>
-			left-align {text-align: left;}
-  		    meta {content:"width=device-width, initial-scale=1"}
-  			html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: left;}
-  			body{margin-top: 50px;} h1 {color: #444444;margin: auto 30px;text-align: center;} h3 {color: #444444;margin-bottom: 20px;}
-  			p {font-size: 14px;color: black;margin-bottom: 10px;}
-			table {border: 1px solid black;border-collapse: collapse;}
-			th, td {text-align: left;padding: 8px;}
-			tr:nth-child(odd) {background-color: #D6EEEE;}
-			td {border-bottom: 1px solid #444444;}
-			.radio-group {display: grid; grid-template-columns: auto 1fr; gap: 10px;align-items: left;}
-  		</style>
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GPIO Configuration</title>
+    <link rel="shortcut icon" href="/favicon" />
+    <style>
+      html {
+        font-family: Helvetica;
+        display: inline-block;
+        margin: 0 auto;
+        text-align: left;
+      }
 
-  		<script>
-			var bit;
+      body {
+        margin-top: 50px;
+      }
 
-			async function init()
-			{
-				myUrl = new URL(window.location.toLocaleString()).searchParams;
-				bit = myUrl.get('bitno');
-				await getConfig(bit);
-				document.getElementById("header").innerText = "Configuration for GPIO BitNo: " +bit;
-				showHelp(document.querySelector('input[name="type"]:checked').value, bit);
-				const gpioTypes = document.querySelectorAll('input[name="type"]');
-				gpioTypes.forEach(type => {
-				type.addEventListener('change', typeChanged);});
-			}
+      h1 {
+        color: #444444;
+        margin: auto 30px;
+        text-align: center;
+      }
 
-			async function typeChanged()
-			{
-      			const type = document.querySelector('input[name="type"]:checked');
-				showHelp(type.value, bit);
-			}
+      table {
+        border: 1px solid black;
+        border-collapse: collapse;
+      }
 
-			async function postit(url, content)
-  			{
-  			   const response = await fetch(url, 
-			   {
-    			      method: "POST",
-    			         //body: JSON.stringify(content),
-    			         body: content,
-    			      headers: 
-    			      	 {"Content-type": "application/json; charset=UTF-8"}
-  			    });
-			}
-	  		
-			async function postConfig(bit) 
-			{
-      			   const selectedType = document.querySelector('input[name="type"]:checked');
-			   var name = document.getElementById('Name');
-              		   var preset0 = document.getElementById('Preset0');
-              		   var preset1 = document.getElementById('Preset1');
-              		   var preset2 = document.getElementById('Preset2');
-              		   var rate = document.getElementById('Rate');
-			   var easingType = document.getElementById('easingType');
-			   var enableRemote = document.getElementById('enableRemote');
-			   var enableLocal = document.getElementById('enableLocal');
-              		   var publishRate = document.getElementById('PublishRate');
+      th,
+      td {
+        text-align: left;
+        padding: 8px;
+        border-bottom: 1px solid #444444;
+      }
 
-  			   var url = "//"+window.location.host+"/api/gpio/config/bit";
-              		   var out = '{"bitNo":' + bit + ',';
-			   out = out + '"name":"' + name.value + '",';
-              		   out = out + '"type":' + selectedType.value + ',';
-              		   out = out + '"preset0":' + preset0.value + ',';
-              		   out = out + '"preset1":' + preset1.value + ',';
-              		   out = out + '"preset2":' + preset2.value + ',';
-              		   out = out + '"rate":' + rate.value + ',';
-              		   out = out + '"easingType":' + easingType.value + ',';
-              		   out = out + '"enableRemote":' + enableRemote.checked + ',';
-              		   out = out + '"enableLocal":' + enableLocal.checked + ',';
-              		   out = out + '"publishRate":' + publishRate.value + '}';
- 			   postit(url,out);
-			};
+      tr:nth-child(odd) {
+        background-color: #d6eeee;
+      }
 
-			async function getConfig(bit) 
-			{
- 			  var response = await fetch("//"+window.location.host+"/api/gpio/config/bit?bitno="+bit);
-			  var data = await response.json();
-			  var resp = JSON.parse(JSON.stringify(data));
-			  ele = document.getElementById('Name');	
-	  		  ele.value = resp.name;
-			  var bitNo = resp.bitNo;
-			  var id = "type" + resp.type
-              		  var ele = document.getElementById(id);	
-	  		  ele.checked = true;
-			  ele = document.getElementById('Preset0');	
-	  		  ele.value = resp.preset0;
-			  ele = document.getElementById('Preset1');	
-	  		  ele.value = resp.preset1;
-			  ele = document.getElementById('Preset2');	
-	  		  ele.value = resp.preset2;
-			  ele = document.getElementById('Rate');	
-	  		  ele.value = resp.rate;
-			  ele = document.getElementById('easingType');
-			  ele.value = resp.easingType;
-			  ele = document.getElementById('enableRemote');
-	  		  ele.checked = resp.enableRemote;
-			  ele = document.getElementById('enableLocal');	
-	  		  ele.checked = resp.enableLocal;
-			  ele = document.getElementById('PublishRate');	
-	  		  ele.value = resp.publishRate;
-			};
+      .type-options label {
+        margin-right: 10px;
+        display: inline-block;
+      }
 
-			function showHelp(type, bit) 
-			{
-				for(var i=0;i<9;i++)
-				{
-					document.getElementById("type" + i + "1").style.display = 'none';  	// Preset 0 help
-					document.getElementById("type" + i + "2").style.display = 'none';	// Preset 1 help
-					document.getElementById("type" + i + "3").style.display = 'none';	// Preset 2 help
-					document.getElementById("type" + i + "4").style.display = 'none';	// Rate help
-					document.getElementById("type" + i + "5").style.display = 'none';	// Easing Type help
-					document.getElementById("type" + i + "8").style.display = 'none';	// Publish Rate help
-					document.getElementById("ServoEasing").style.display = 'none';
-				}
-console.log("type:" + type);
-console.log("bit:" + bit);
+      .error {
+        color: #b30000;
+        min-height: 1.5em;
+      }
+    </style>
+    <script src="/common.js"></script>
+    <script>
+      let bit = "0";
 
-				document.getElementById("type" + type + "1").style.display = 'block';			
-				document.getElementById("type" + type + "2").style.display = 'block';			 
-				document.getElementById("type" + type + "3").style.display = 'block';			
-				document.getElementById("type" + type + "4").style.display = 'block';					
-				document.getElementById("type" + type + "5").style.display = 'block';	
-				document.getElementById("type" + type + "8").style.display = 'block';
-				if((type == 3)||(type == 4))document.getElementById("ServoEasing").style.display = 'table-row';	
+      const GPIO_TYPES = [
+        { value: 0, text: "None", id: "type0" },
+        { value: 1, text: "PWM", id: "type1" },
+        { value: 2, text: "DIGOUT", id: "type2" },
+        { value: 3, text: "SERVO", id: "type3" },
+        { value: 4, text: "SERVO_ACTUATOR", id: "type4" },
+        { value: 5, text: "DIGIN", id: "type5" },
+        { value: 6, text: "AIN", id: "type6" },
+        { value: 7, text: "DIGOUT_PULSE", id: "type7" },
+        { value: 8, text: "PWM_PULSE", id: "type8" },
+      ];
 
-				document.getElementById("type6").style.display = 'none';
-				document.getElementById("lbl6").style.display = 'none';
-				if((bit == 11) || (bit == 15))document.getElementById("type6").style.display = 'block'; // only allow AIN selection if bit can be configured as AIN
-				if((bit == 11) || (bit == 15))document.getElementById("lbl6").style.display = 'block'; // only allow AIN selection if bit can be configured as AIN
+      const HELP = {
+        0: {
+          preset0: "Free (can be read by Edge Action Software)",
+          preset1: "Free (can be read by Edge Action Software)",
+          preset2: "Free (can be read by Edge Action Software)",
+          rate: "Free (can be read by Edge Action Software)",
+          easing: "Not Used",
+          publish: "Not Used",
+          showEasing: false,
+        },
+        1: {
+          preset0: "Not Used",
+          preset1: "OFF PWM frequency (0-255)",
+          preset2: "ON PWM frequency (0-255)",
+          rate: "Not Used",
+          easing: "Not Used",
+          publish: "Background MQTT Publish Rate (mS) -even if value does not change",
+          showEasing: false,
+        },
+        2: {
+          preset0: "Not Used",
+          preset1: "Not Used",
+          preset2: "Not Used",
+          rate: "Not Used",
+          easing: "Not Used",
+          publish: "Background MQTT Publish Rate (mS) -even if value does not change",
+          showEasing: false,
+        },
+        3: {
+          preset0: "Angle preset 0-180 deg",
+          preset1: "Angle preset 0-180 deg",
+          preset2: "Angle preset 0-180 deg",
+          rate: "Slew Rate (degrees per second)",
+          easing: "Select easing type",
+          publish: "Background MQTT Publish Rate (mS) -even if value does not change",
+          showEasing: true,
+        },
+        4: {
+          preset0: "Angle preset 0-180 deg",
+          preset1: "Angle preset 0-180 deg",
+          preset2: "Angle preset 0-180 deg",
+          rate: "Slew Rate (degrees per second)",
+          easing: "Select easing type",
+          publish: "Background MQTT Publish Rate (mS) -even if value does not change",
+          showEasing: true,
+        },
+        5: {
+          preset0: "Not Used",
+          preset1: "Not Used",
+          preset2: "Not Used",
+          rate: "Input Polling Rate (mS)",
+          easing: "Not Used",
+          publish: "Background MQTT Publish Rate (mS) -even if value does not change",
+          showEasing: false,
+        },
+        6: {
+          preset0: "Not Used",
+          preset1: "DeadBand",
+          preset2: "Not Used",
+          rate: "Input Polling Rate (mS)",
+          easing: "Not Used",
+          publish: "Background MQTT Publish Rate (mS) -even if value does not change",
+          showEasing: false,
+        },
+        7: {
+          preset0: "Not Used",
+          preset1: "Not Used",
+          preset2: "Not Used",
+          rate: "Cycle Period (mS)",
+          easing: "Not Used",
+          publish: "Background MQTT Publish Rate (mS) -even if value does not change",
+          showEasing: false,
+        },
+        8: {
+          preset0: "Mark Period (mS)",
+          preset1: "OFF PWM frequency (0-255)",
+          preset2: "ON PWM frequency (0-255)",
+          rate: "Cycle Period (mS)",
+          easing: "Not Used",
+          publish: "Background MQTT Publish Rate (mS) -even if value does not change",
+          showEasing: false,
+        },
+      };
 
-			};
+      const EASING_OPTIONS = [
+        [0, "EASE_LINEAR"],
+        [1, "EASE_QUADRATIC_IN"],
+        [65, "EASE_QUADRATIC_OUT"],
+        [129, "EASE_QUADRATIC_IN_OUT"],
+        [193, "EASE_QUADRATIC_BOUNCING"],
+        [2, "EASE_CUBIC_IN"],
+        [66, "EASE_CUBIC_OUT"],
+        [130, "EASE_CUBIC_IN_OUT"],
+        [194, "EASE_CUBIC_BOUNCING"],
+        [3, "EASE_QUARTIC_IN"],
+        [67, "EASE_QUARTIC_OUT"],
+        [131, "EASE_QUARTIC_IN_OUT"],
+        [195, "EASE_QUARTIC_BOUNCING"],
+        [8, "EASE_SINE_IN"],
+        [72, "EASE_SINE_OUT"],
+        [136, "EASE_SINE_IN_OUT"],
+        [200, "EASE_SINE_BOUNCING"],
+        [9, "EASE_CIRCULAR_IN"],
+        [73, "EASE_CIRCULAR_OUT"],
+        [137, "EASE_CIRCULAR_IN_OUT"],
+        [201, "EASE_CIRCULAR_BOUNCING"],
+        [10, "EASE_BACK_IN"],
+        [74, "EASE_BACK_OUT"],
+        [138, "EASE_BACK_IN_OUT"],
+        [202, "EASE_BACK_BOUNCING"],
+        [11, "EASE_ELASTIC_IN"],
+        [75, "EASE_ELASTIC_OUT"],
+        [139, "EASE_ELASTIC_IN_OUT"],
+        [203, "EASE_ELASTIC_BOUNCING"],
+        [76, "EASE_BOUNCE_IN"],
+        [12, "EASE_BOUNCE_OUT"],
+        [13, "EASE_PRECISION_IN"],
+        [77, "EASE_PRECISION_OUT"],
+      ];
 
-		</script>
-  	</head>
-	<body onload = "init()">
-		<h1><p font-size: 30 px;text-align: "centre";color: #444444; id="header";></p>GPIO Configuration</h1>
-  		<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>
-			<tr>
-				<td width=30%">Name</td>
-				<td width=30%"><input type="text" id="Name" name="Name" value="- Loading..."></td>
-				<td width=40%">Friendly Name</td>
-			</tr>
-			<tr>
-				<td width=30%">GPIO Type</td>
-				<td width=30%">
-    				<input type="radio" name= "type" Id="type0" value="0" 1/>None
-    				<input type="radio" name= "type" Id="type1" value="1" 0/>PWM
-    				<input type="radio" name= "type" Id="type2" value="2" 0/>DIGOUT
-    				<input type="radio" name= "type" Id="type3" value="3" 0/>SERVO
-					<input type="radio" name= "type" Id="type4" value="4" 0/>SERVO_ACTUATOR
-    				<input type="radio" name= "type" Id="type5" value="5" 0/>DIGIN
-    				<input type="radio" name= "type" Id="type6" value="6" 0/><label for="type6" Id="lbl6">AIN</label>
-    				<input type="radio" name= "type" Id="type7" value="7" 0/>DIGOUT_PULSE
-    				<input type="radio" name= "type" Id="type8" value="8" 0/>PWM_PULSE
-    			</td>
-				<td width=40%">
-					<span></span>
-				</td></td>
-			</tr>
-			<tr>
-				<td width=30%">Preset 0</td>
-				<td width=30%"><input type="text" id="Preset0" name="Preset0" value="- Loading..."></td>
-				<td width=40%">
-					<span id="type01" >Free (can be read by Edge Action Software)</span>
-					<span id="type11" >Not Used</span>
-					<span id="type21" >Not Used</span>
-					<span id="type31" >Angle preset 0-180 deg</span>
-					<span id="type41" >Angle preset 0-180 deg</span>
-					<span id="type51" >Not Used</span>
-					<span id="type61" >Not Used</span>
-					<span id="type71" >Not Used</span>
-					<span id="type81" >Mark Period (mS)</span>
-				</td>
-			</tr>
-			<tr>
-				<td width=30%">Preset 1</td>
-				<td width=30%"><input type="text" id="Preset1" name="Preset1" value="- Loading..."></td>
-				<td width=40%">
-				<span id="type02">Free (can be read by Edge Action Software)</span>
-				<span id="type12">OFF PWM frequency (0-255)</span>
-				<span id="type22">Not Used</span>
-				<span id="type32">Angle preset 0-180 deg</span>
-				<span id="type42">Angle preset 0-180 deg</span>
-				<span id="type52">Not Used</span>
-				<span id="type62">DeadBand</span>
-				<span id="type72">Not Used</span>
-				<span id="type82">OFF PWM frequency (0-255)</span>
-				</td>
-			</tr>
-			<tr>
-				<td width=30%">Preset 2</td>
-				<td width=30%"><input type="text" id="Preset2" name="Preset2" value="- Loading..."></td>
-				<td width=40%">
-					<span id="type03">Free (can be read by Edge Action Software)</span>
-					<span id="type13">ON PWM frequency (0-255)</span>
-					<span id="type23">Not Used</span>
-					<span id="type33">Angle preset 0-180 deg</span>
-					<span id="type43">Angle preset 0-180 deg</span>	
-					<span id="type53">Not Used</span>
-					<span id="type63">Not Used</span>
-					<span id="type73">Not Used</span>
-					<span id="type83">ON PWM frequency (0-255)</span>				
-				</td>
-			</tr>
-			<tr>
-				<td width=30%">Rate</td>
-				<td width=30%"><input type="text" id="Rate" name="Rate" value="- Loading..."></td>
-				<td width=40%">
-					<span id="type04">Free (can be read by Edge Action Software)</span>
-					<span id="type14">Not Used</span>
-					<span id="type24">Not Used</span>
-					<span id="type34">Slew Rate (degrees per second)</span>
-					<span id="type44">Slew Rate (degrees per second)</span>
-					<span id="type54">Input Polling Rate (mS)</span>
-					<span id="type64">Input Polling Rate (mS)</span>
-					<span id="type74">Cycle Period (mS)</span>
-					<span id="type84">Cycle Period (mS)</span>				
-				</td>
-			</tr>
-			<tr id="ServoEasing">
-				<td width=30%">Easing Type</td>
-				<td width=30%">
-					<select id="easingType" name="easingType">
-					<option value="0">EASE_LINEAR</option>
-					<option value="1">EASE_QUADRATIC_IN</option>
-					<option value="65">EASE_QUADRATIC_OUT</option>
-					<option value="129">EASE_QUADRATIC_IN_OUT</option>
-					<option value="193">EASE_QUADRATIC_BOUNCING</option>
-					<option value="2">EASE_CUBIC_IN</option>
-					<option value="66">EASE_CUBIC_OUT</option>
-					<option value="130">EASE_CUBIC_IN_OUT</option>
-					<option value="194">EASE_CUBIC_BOUNCING</option>
-					<option value="3">EASE_QUARTIC_IN</option>
-					<option value="67">EASE_QUARTIC_OUT</option>
-					<option value="131">EASE_QUARTIC_IN_OUT</option>
-					<option value="195">EASE_QUARTIC_BOUNCING</option>
-					<option value="8">EASE_SINE_IN</option>
-					<option value="72">EASE_SINE_OUT</option>
-					<option value="136">EASE_SINE_IN_OUT</option>
-					<option value="200">EASE_SINE_BOUNCING</option>
-					<option value="9">EASE_CIRCULAR_IN</option>
-					<option value="73">EASE_CIRCULAR_OUT</option>
-					<option value="137">EASE_CIRCULAR_IN_OUT</option>
-					<option value="201">EASE_CIRCULAR_BOUNCING</option>
-					<option value="10">EASE_BACK_IN</option>
-					<option value="74">EASE_BACK_OUT</option>
-					<option value="138">EASE_BACK_IN_OUT</option>
-					<option value="202">EASE_BACK_BOUNCING</option>
-					<option value="11">EASE_ELASTIC_IN</option>
-					<option value="75">EASE_ELASTIC_OUT</option>
-					<option value="139">EASE_ELASTIC_IN_OUT</option>
-					<option value="203">EASE_ELASTIC_BOUNCING</option>
-					<option value="76">EASE_BOUNCE_IN</option>
-					<option value="12">EASE_BOUNCE_OUT</option>
-					<option value="13">EASE_PRECISION_IN</option>
-					<option value="77">EASE_PRECISION_OUT</option>
-				</select></td>
-				<td width=40%">
-					<span id="type05" style="display:none">Not Used</span>
-					<span id="type15" style="display:none">Not Used</span>
-					<span id="type25" style="display:none">Not Used</span>
-					<span id="type35" style="display:none">Select easing type</span>
-					<span id="type45" style="display:none">Select easing type</span>
-					<span id="type55" style="display:none">Not Used</span>
-					<span id="type65" style="display:none">Not Used</span>
-					<span id="type75" style="display:none">Not Used</span>
-					<span id="type85" style="display:none">Not Used</span>
-				</td>
-			</tr>
-			<tr>
-				<td width=30%">
-  		    		Enable Remote Control</td>
-				<td width=30%"><input type="checkbox" id="enableRemote" value="Option1"></td>
-				<td width=40%">
-					<span>Respond to demands via MQTT</span>
-				</td>
-			</tr>
-			<tr>
-				<td width=30%">
-  		    		Enable Local Control</td>
-				<td width=30%"><input type="checkbox" id="enableLocal" value="Option1"></td>
-				<td width=40%">
-					<span>Respond to local (edge software) demands</span>
-				</td>
-			</tr>
-			<tr>
-				<td width=30%">
-  		    			Publish Rate</td>
-				<td width=30%"><input type="text" id="PublishRate" name="PublishRate" value="- Loading..."></td>
-				<td width=40%">
-					<span id="type08">Not Used</span>
-					<span id="type18">Background MQTT Publish Rate (mS) -even if value does not change</span>
-					<span id="type28">Background MQTT Publish Rate (mS) -even if value does not change</span>
-					<span id="type38">Background MQTT Publish Rate (mS) -even if value does not change</span>
-					<span id="type48">Background MQTT Publish Rate (mS) -even if value does not change</span>
-					<span id="type58">Background MQTT Publish Rate (mS) -even if value does not change</span>
-					<span id="type68">Background MQTT Publish Rate (mS) -even if value does not change</span>
-					<span id="type78">Background MQTT Publish Rate (mS) -even if value does not change</span>
-					<span id="type88">Background MQTT Publish Rate (mS) -even if value does not change</span>
-				</td>
-			</tr>
-			</table>
-			</br><br>
-			
- 	        <button type="button" style="height:60px;width:200px;font-size:20px" onclick="postConfig(bit)">Save</button><br><br>
+      function setError(message) {
+        setPageError(message || "");
+      }
 
-			</br></br>
-			<table width="100%";outline: 5px solid #1C6EA4;outline-offset: 0px;>
-			<tr>
-			<td style="width:20%"><a href='/page/node'>node</a></td>
-			<td style="width:20%"><a href='/page/gpio'>gpio</a></td>
-			<td style="width:20%"><a href='/page/action'>action</a></td>
-			<td style="width:20%"><a href='/page/sound'>sound</a></td>
-			<td style="width:20%"><a href='/page/objects'>objects</a></td>
-			</tr>
-		</table>
-  	</body>
-  </html>
-  
-  
-  
-  
-  
-  
+      function renderTypeOptions() {
+        const host = document.getElementById("typeOptions");
+        host.innerHTML = GPIO_TYPES.map((t) => {
+          const ainLabel = t.value === 6 ? "<span id=\"lbl6\">AIN</span>" : t.text;
+          return `<label><input type="radio" name="type" id="${t.id}" value="${t.value}" />${ainLabel}</label>`;
+        }).join("");
+      }
+
+      function renderEasingOptions() {
+        const select = document.getElementById("easingType");
+        select.innerHTML = EASING_OPTIONS.map(([value, text]) => `<option value="${value}">${text}</option>`).join("");
+      }
+
+      function selectedTypeValue() {
+        const selected = document.querySelector("input[name='type']:checked");
+        return selected ? Number(selected.value) : 0;
+      }
+
+      function showHelp(typeValue, bitValue) {
+        const typeInfo = HELP[typeValue] || HELP[0];
+
+        document.getElementById("preset0Help").textContent = typeInfo.preset0;
+        document.getElementById("preset1Help").textContent = typeInfo.preset1;
+        document.getElementById("preset2Help").textContent = typeInfo.preset2;
+        document.getElementById("rateHelp").textContent = typeInfo.rate;
+        document.getElementById("easingHelp").textContent = typeInfo.easing;
+        document.getElementById("publishHelp").textContent = typeInfo.publish;
+        document.getElementById("ServoEasing").style.display = typeInfo.showEasing ? "table-row" : "none";
+
+        const allowAin = Number(bitValue) === 11 || Number(bitValue) === 15;
+        const ainRadio = document.getElementById("type6");
+        const ainLabel = document.getElementById("lbl6");
+        if (ainRadio && ainLabel) {
+          ainRadio.style.display = allowAin ? "inline-block" : "none";
+          ainLabel.style.display = allowAin ? "inline" : "none";
+
+          if (!allowAin && ainRadio.checked) {
+            document.getElementById("type0").checked = true;
+          }
+        }
+      }
+
+      async function getConfig(bitValue) {
+        const resp = await getJson(`/api/gpio/config/bit?bitno=${bitValue}`);
+
+        document.getElementById("Name").value = resp.name;
+        document.getElementById(`type${resp.type}`).checked = true;
+        document.getElementById("Preset0").value = resp.preset0;
+        document.getElementById("Preset1").value = resp.preset1;
+        document.getElementById("Preset2").value = resp.preset2;
+        document.getElementById("Rate").value = resp.rate;
+        document.getElementById("easingType").value = String(resp.easingType);
+        document.getElementById("enableRemote").checked = !!resp.enableRemote;
+        document.getElementById("enableLocal").checked = !!resp.enableLocal;
+        document.getElementById("PublishRate").value = resp.publishRate;
+      }
+
+      async function postConfig() {
+        try {
+          const out = {
+            bitNo: Number(bit),
+            name: document.getElementById("Name").value,
+            type: selectedTypeValue(),
+            preset0: Number(document.getElementById("Preset0").value),
+            preset1: Number(document.getElementById("Preset1").value),
+            preset2: Number(document.getElementById("Preset2").value),
+            rate: Number(document.getElementById("Rate").value),
+            easingType: Number(document.getElementById("easingType").value),
+            enableRemote: document.getElementById("enableRemote").checked,
+            enableLocal: document.getElementById("enableLocal").checked,
+            publishRate: Number(document.getElementById("PublishRate").value),
+          };
+
+          await postJson("/api/gpio/config/bit", out);
+          setError("");
+        } catch (error) {
+          setError(`Save failed: ${error}`);
+        }
+      }
+
+      async function init() {
+        renderTypeOptions();
+        renderEasingOptions();
+
+        const search = new URL(window.location.href).searchParams;
+        bit = search.get("bitno") || "0";
+
+        await getConfig(bit);
+
+        document.getElementById("header").innerText = `Configuration for GPIO BitNo: ${bit}`;
+        showHelp(selectedTypeValue(), bit);
+
+        document.querySelectorAll("input[name='type']").forEach((input) => {
+          input.addEventListener("change", () => {
+            showHelp(selectedTypeValue(), bit);
+          });
+        });
+      }
+    </script>
+  </head>
+  <body onload="init()">
+    <h1><span id="header"></span>GPIO Configuration</h1>
+
+    <p id="error" class="error"></p>
+
+    <table width="100%" style="outline: 5px solid #1c6ea4; outline-offset: 0px">
+      <tr>
+        <td width="30%">Name</td>
+        <td width="30%"><input type="text" id="Name" name="Name" value="- Loading..." /></td>
+        <td width="40%">Friendly Name</td>
+      </tr>
+      <tr>
+        <td width="30%">GPIO Type</td>
+        <td width="30%" class="type-options"><div id="typeOptions"></div></td>
+        <td width="40%"></td>
+      </tr>
+      <tr>
+        <td width="30%">Preset 0</td>
+        <td width="30%"><input type="text" id="Preset0" name="Preset0" value="- Loading..." /></td>
+        <td width="40%"><span id="preset0Help"></span></td>
+      </tr>
+      <tr>
+        <td width="30%">Preset 1</td>
+        <td width="30%"><input type="text" id="Preset1" name="Preset1" value="- Loading..." /></td>
+        <td width="40%"><span id="preset1Help"></span></td>
+      </tr>
+      <tr>
+        <td width="30%">Preset 2</td>
+        <td width="30%"><input type="text" id="Preset2" name="Preset2" value="- Loading..." /></td>
+        <td width="40%"><span id="preset2Help"></span></td>
+      </tr>
+      <tr>
+        <td width="30%">Rate</td>
+        <td width="30%"><input type="text" id="Rate" name="Rate" value="- Loading..." /></td>
+        <td width="40%"><span id="rateHelp"></span></td>
+      </tr>
+      <tr id="ServoEasing">
+        <td width="30%">Easing Type</td>
+        <td width="30%"><select id="easingType" name="easingType"></select></td>
+        <td width="40%"><span id="easingHelp"></span></td>
+      </tr>
+      <tr>
+        <td width="30%">Enable Remote Control</td>
+        <td width="30%"><input type="checkbox" id="enableRemote" value="Option1" /></td>
+        <td width="40%">Respond to demands via MQTT</td>
+      </tr>
+      <tr>
+        <td width="30%">Enable Local Control</td>
+        <td width="30%"><input type="checkbox" id="enableLocal" value="Option1" /></td>
+        <td width="40%">Respond to local (edge software) demands</td>
+      </tr>
+      <tr>
+        <td width="30%">Publish Rate</td>
+        <td width="30%"><input type="text" id="PublishRate" name="PublishRate" value="- Loading..." /></td>
+        <td width="40%"><span id="publishHelp"></span></td>
+      </tr>
+    </table>
+
+    <br /><br />
+
+    <button type="button" style="height: 60px; width: 200px; font-size: 20px" onclick="postConfig()">Save</button>
+
+    <br /><br />
+
+    <table width="100%" style="outline: 5px solid #1c6ea4; outline-offset: 0px">
+      <tr>
+        <td style="width: 20%"><a href="/page/node">node</a></td>
+        <td style="width: 20%"><a href="/page/gpio">gpio</a></td>
+        <td style="width: 20%"><a href="/page/action">action</a></td>
+        <td style="width: 20%"><a href="/page/sound">sound</a></td>
+        <td style="width: 20%"><a href="/page/objects">objects</a></td>
+      </tr>
+    </table>
+  </body>
+</html>
