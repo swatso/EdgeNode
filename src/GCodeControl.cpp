@@ -25,7 +25,7 @@ constexpr float kPoseMaxX = 265.0F;
 constexpr float kPoseMinY = 0.0F;
 constexpr float kPoseMaxY = 225.0F;
 constexpr uint32_t kMarlinAckTimeoutMs = 6000;
-constexpr uint32_t kMarlinExecutionWaitTimeoutMs = 10;
+constexpr uint32_t kMarlinExecutionWaitTimeoutMs = 30000;
 constexpr TickType_t kMarlinWaitSliceTicks = pdMS_TO_TICKS(20);
 
 TaskHandle_t posePersistenceTaskHandle = nullptr;
@@ -386,17 +386,17 @@ void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
   gcodeObjects[8].setRFIDTag("00EEECC4");
   gcodeObjects[9].setName("Object9");
   gcodeObjects[9].setRFIDTag("00EEECD4");
-  gcodeObjects[10].setName("Object10");
+  gcodeObjects[10].setName("Foreman");
   gcodeObjects[10].setRFIDTag("00EEECCE");
-  gcodeObjects[11].setName("Object11");
+  gcodeObjects[11].setName("Jet1");
   gcodeObjects[11].setRFIDTag("00EEEC61");
-  gcodeObjects[12].setName("Object12");
+  gcodeObjects[12].setName("Jet2");
   gcodeObjects[12].setRFIDTag("00EEEC68");
-  gcodeObjects[13].setName("Object13");
+  gcodeObjects[13].setName("2 Workmen");
   gcodeObjects[13].setRFIDTag("00EEEC5F");
-  gcodeObjects[14].setName("Object14");
+  gcodeObjects[14].setName("ShedA-door");
   gcodeObjects[14].setRFIDTag("00EEEC34");
-  gcodeObjects[15].setName("Object15");
+  gcodeObjects[15].setName("ShedB-door");
   gcodeObjects[15].setRFIDTag("00EEEC76");
 
   if (posePersistenceTaskHandle == nullptr)
