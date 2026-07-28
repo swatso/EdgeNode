@@ -35,8 +35,6 @@ const char* PARAM_INPUT_3 = "hostName";
 AsyncWebServer server(80);
 
 namespace {
-QueueHandle_t objectSelectionQueue = nullptr;
-QueueHandle_t objectRemovalQueue = nullptr;
 QueueHandle_t objectReloadQueue = nullptr;
 QueueHandle_t objectIdentifyQueue = nullptr;
 constexpr size_t kJsonResponseBufferSize = 256;
@@ -44,30 +42,8 @@ constexpr int kGpioCount = 16;
 constexpr int kTrackCount = 16;
 constexpr int kActionCount = 16;
 
-void objectSelectionTask(void*);
-void objectRemovalTask(void*);
 void objectReloadTask(void*);
 void objectIdentifyTask(void*);
-
-bool queueObjectSelection(int index)
-{
-  if (objectSelectionQueue == nullptr)
-  {
-    return false;
-  }
-
-  return xQueueOverwrite(objectSelectionQueue, &index) == pdTRUE;
-}
-
-bool queueObjectRemoval(int index)
-{
-  if (objectRemovalQueue == nullptr)
-  {
-    return false;
-  }
-
-  return xQueueOverwrite(objectRemovalQueue, &index) == pdTRUE;
-}
 
 bool queueObjectReload(int index)
 {
@@ -90,51 +66,6 @@ bool queueObjectIdentify()
   return xQueueOverwrite(objectIdentifyQueue, &trigger) == pdTRUE;
 }
 
-void objectSelectionTask(void*)
-{
-  int index = -1;
-
-  for (;;)
-  {
-    if (xQueueReceive(objectSelectionQueue, &index, portMAX_DELAY) == pdTRUE)
-    {
-      if ((index < 0) || (index >= kObjectCount))
-      {
-        Serial.print("Invalid object selection index: ");
-        Serial.println(index);
-        continue;
-      }
-
-      Serial.print("select object: ");
-      Serial.println(index);
-      setCurrentObjectIndex(index);
-    }
-  }
-}
-
-void objectRemovalTask(void*)
-{
-  int index = -1;
-
-  for (;;)
-  {
-    if (xQueueReceive(objectRemovalQueue, &index, portMAX_DELAY) == pdTRUE)
-    {
-      if ((index < 0) || (index >= kObjectCount))
-      {
-        Serial.print("Invalid object removal index: ");
-        Serial.println(index);
-        continue;
-      }
-
-      Serial.print("remove object: ");
-      Serial.println(index);
-      gcodeObjects[index].pose.x = 0;
-      gcodeObjects[index].pose.y = 0;
-      gcodeObjects[index].pose.heading = 90;
-    }
-  }
-}
 
 void objectReloadTask(void*)
 {
@@ -296,44 +227,6 @@ void setupWiFi()
 {
   if(initWiFi()) 
   {
-    if (objectSelectionQueue == nullptr)
-    {
-      objectSelectionQueue = xQueueCreate(1, sizeof(int));
-      if (objectSelectionQueue != nullptr)
-      {
-        xTaskCreatePinnedToCore(objectSelectionTask,
-                                "ObjectSelect",
-                                4096,
-                                nullptr,
-                                1,
-                                nullptr,
-                                1);
-      }
-      else
-      {
-        Serial.println("Failed to create objectSelectionQueue");
-      }
-    }
-
-    if (objectRemovalQueue == nullptr)
-    {
-      objectRemovalQueue = xQueueCreate(1, sizeof(int));
-      if (objectRemovalQueue != nullptr)
-      {
-        xTaskCreatePinnedToCore(objectRemovalTask,
-                                "ObjectRemove",
-                                4096,
-                                nullptr,
-                                1,
-                                nullptr,
-                                1);
-      }
-      else
-      {
-        Serial.println("Failed to create objectRemovalQueue");
-      }
-    }
-
     if (objectReloadQueue == nullptr)
     {
       objectReloadQueue = xQueueCreate(1, sizeof(int));
@@ -630,15 +523,16 @@ void setupWiFi()
       }
     });
 
-    server.on("/api/object/selected", HTTP_GET, [](AsyncWebServerRequest *request) 
+    server.on("/api/object/pose", HTTP_GET, [](AsyncWebServerRequest *request) 
     {
-      if (request->url() == "/api/object/selected")
+      if (request->url() == "/api/object/pose")
       {
-        //Serial.print("Received /api/object/selected GET request returning:");
-        //Serial.println(currentObjectIndex);
+        //Serial.print("Received /api/object/pose GET request");
         AsyncResponseStream *response = request->beginResponseStream("application/json", kJsonResponseBufferSize);
         JsonDocument doc;
-        doc["index"] = currentObjectIndex;
+        doc["poseX"] = currentPose.x;
+        doc["poseY"] = currentPose.y;
+        doc["poseBrg"] = currentPose.heading;
         serializeJson(doc,*response);  
         request->send(response);
       }
@@ -663,11 +557,8 @@ void setupWiFi()
         //Serial.println(index);
         AsyncResponseStream *response = request->beginResponseStream("application/json", kJsonResponseBufferSize);
         JsonDocument doc;
-        doc["index"] = currentObjectIndex;
+        doc["index"] = index;
         doc["name"] = gcodeObjects[index].name;
-        doc["poseX"] = gcodeObjects[index].pose.x;
-        doc["poseY"] = gcodeObjects[index].pose.y;
-        doc["poseBrg"] = gcodeObjects[index].pose.heading;
         serializeJson(doc,*response);  
         request->send(response);
       }
@@ -904,41 +795,6 @@ void setupWiFi()
           }
       }
 
-      if (request->url() == "/api/object/select") 
-      {
-          JsonDocument doc;
-          DeserializationError error = deserializeJson(doc, (const char*)data);
-          if(error)
-          {
-              Serial.println("Deserialisationerror");
-          }
-          else
-          {
-            int index = (int) doc["index"];
-            if (!queueObjectSelection(index))
-            {
-              Serial.println("Failed to queue object selection");
-            }
-          }
-      }
-
-      if (request->url() == "/api/object/remove") 
-      {
-          JsonDocument doc;
-          DeserializationError error = deserializeJson(doc, (const char*)data);
-          if(error)
-          {
-              Serial.println("Deserialisationerror");
-          }
-          else
-          {
-            int index = (int) doc["index"];
-            if (!queueObjectRemoval(index))
-            {
-              Serial.println("Failed to queue object removal");
-            }
-          }
-      }
 
       if (request->url() == "/api/object/reload") 
       {

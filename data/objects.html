@@ -56,18 +56,10 @@
 
       async function init() {
         renderObjectRows();
-        await getSelectedObject();
         await loadAllObjects();
 
         setInterval(async function () {
-          const currentObject = selectedObject;
-          await getSelectedObject();
-
-          if (currentObject !== selectedObject) {
-            await loadAllObjects();
-          } else if (selectedObject >= 0) {
-            await getObjectStatus(selectedObject);
-          }
+          await getObjectPose();
         }, 1000);
       }
 
@@ -79,13 +71,8 @@
           rows.push(`
             <tr>
               <td width="10%"><span id="index${i}">...</span></td>
-              <td width="20%"><span id="name${i}">-Loading</span></td>
-              <td width="10%"><span id="poseX${i}">...</span></td>
-              <td width="10%"><span id="poseY${i}">...</span></td>
-              <td width="10%"><span id="poseBrg${i}">...</span></td>
-              <td width="13%"><button type="button" onclick="launchSelect(${i})">Select</button></td>
-              <td width="13%"><button type="button" onclick="launchRemove(${i})">Remove</button></td>
-              <td width="14%"><button type="button" onclick="launchReload(${i})">ReLoad</button></td>
+              <td width="60%"><span id="name${i}">-Loading</span></td>
+              <td width="30%"><button type="button" onclick="launchReload(${i})">ReLoad</button></td>
             </tr>
           `);
         }
@@ -102,49 +89,29 @@
       async function getObjectStatus(index) {
         try {
           document.getElementById(`name${index}`).innerText = "Loading...";
-          document.getElementById(`poseX${index}`).innerText = "...";
-          document.getElementById(`poseY${index}`).innerText = "...";
-          document.getElementById(`poseBrg${index}`).innerText = "...";
-
           const resp = await getJson(`/api/object/status/index?index=${index}`);
-
           document.getElementById(`index${index}`).innerText = index === selectedObject ? `${index}*` : `${index}`;
           document.getElementById(`name${index}`).innerText = resp.name;
-          document.getElementById(`poseX${index}`).innerText = resp.poseX;
-          document.getElementById(`poseY${index}`).innerText = resp.poseY;
-          document.getElementById(`poseBrg${index}`).innerText = resp.poseBrg;
           setPageError("");
         } catch (error) {
           setPageError(`Failed to load object ${index}: ${error}`);
         }
       }
 
-      async function launchSelect(index) {
-        await postJson("/api/object/select", { index: index });
-        await delay(1000);
-        await getObjectStatus(index);
-      }
-
-      async function launchRemove(index) {
-        await postJson("/api/object/remove", { index: index });
-        await delay(1000);
-        await getObjectStatus(index);
-      }
-
       async function launchReload(index) {
         await postJson("/api/object/reload", { index: index });
-        await delay(1000);
-        await getObjectStatus(index);
       }
 
       async function launchIdentify() {
         await postJson("/api/object/identify", {});
       }
 
-      async function getSelectedObject() {
+      async function getObjectPose() {
         try {
-          const resp = await getJson("/api/object/selected");
-          selectedObject = resp.index;
+          const resp = await getJson("/api/object/pose");
+          document.getElementById(`poseX`).innerText = resp.poseX;
+          document.getElementById(`poseY`).innerText = resp.poseY;
+          document.getElementById(`poseBrg`).innerText = resp.poseBrg;
           setPageError("");
         } catch (error) {
           setPageError(`Failed to get selected object: ${error}`);
@@ -164,17 +131,31 @@
     <p id="error" class="error"></p>
 
     <table width="100%" style="outline: 5px solid #1c6ea4; outline-offset: 0px">
+      <tr>
+        <td width="10%">Pose X</td>
+        <td width="30%"><span id="poseX">...</span></td>
+      </tr>
+      <tr>
+        <td width="10%">Pose Y</td>
+        <td width="30%"><span id="poseY">...</span></td>
+      </tr>
+      <tr>
+        <td width="10%">Pose Brg</td>
+        <td width="30%"><span id="poseBrg">...</span></td>
+      </tr>
+    </table>
+    <br /><br />
+    <table width="100%" style="outline: 5px solid #1c6ea4; outline-offset: 0px">
       <tbody id="objectBody"></tbody>
     </table>
-
     <br /><br />
-
     <p>
       Identify using RFID Tag and load to Start Of Day pose
       <button type="button" onclick="launchIdentify()">Identify</button>
     </p>
 
     <br /><br />
+
 
     <table width="100%" style="outline: 5px solid #1c6ea4; outline-offset: 0px">
       <tr>

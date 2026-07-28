@@ -43,7 +43,11 @@ const char* baseActionTopic = "track/action/nn00";
 const char* baseReporterTopic = "track/reporter/nn00";
 const char* RFIDReporterTopic = "track/reporter/2500";
 const char* GCodeDriverG1Topic = "track/reporter/2700";
-const char* GCodeObjectIndexTopic = "track/reporter/2710";
+const char* GCodeDriverSpeedTopic = "track/reporter/2710";
+const char* GCodeDriverHomeTopic = "track/reporter/2711";
+const char* GCodeDriverLockTopic = "track/reporter/2712";
+const char* GCodeDriverUnlockTopic = "track/reporter/2713";
+
 char sensorTopic[30];
 char turnoutTopic[30];
 char soundControlTopic[30];
@@ -69,6 +73,8 @@ constexpr float kPoseMinX = 0.0F;
 constexpr float kPoseMaxX = 265.0F;
 constexpr float kPoseMinY = 0.0F;
 constexpr float kPoseMaxY = 225.0F;
+constexpr float kPoseMinZ = 0.0F;
+constexpr float kPoseMaxZ = 359.0F;
 
 float clampf(float value, float minValue, float maxValue)
 {
@@ -88,12 +94,6 @@ bool buildAbsoluteG1FromRelative(const char* payload, char* output, size_t outpu
   if ((payload == nullptr) || (output == nullptr) || (outputSize == 0))
   {
     Serial.println("Error: Null pointer or zero size in buildAbsoluteG1FromRelative");
-    return false;
-  }
-
-  if ((currentObjectIndex < 0) || (currentObjectIndex >= kObjectCount))
-  {
-    Serial.println("Error: currentObjectIndex is out of bounds in buildAbsoluteG1FromRelative");
     return false;
   }
 
@@ -152,9 +152,9 @@ bool buildAbsoluteG1FromRelative(const char* payload, char* output, size_t outpu
     return false;
   }
 
-  float absX = objectPoses[currentObjectIndex].x;
-  float absY = objectPoses[currentObjectIndex].y;
-  float absZ = objectPoses[currentObjectIndex].heading;
+  float absX = currentPose.x;
+  float absY = currentPose.y;
+  float absZ = currentPose.heading;
   const float oldX = absX;
   const float oldY = absY;
   const float oldZ = absZ;
@@ -174,7 +174,7 @@ bool buildAbsoluteG1FromRelative(const char* payload, char* output, size_t outpu
 
   absX = clampf(absX, kPoseMinX, kPoseMaxX);
   absY = clampf(absY, kPoseMinY, kPoseMaxY);
-
+absZ = clampf(absZ, kPoseMinZ, kPoseMaxZ);
   if (feedToken[0] != '\0')
   {
     snprintf(output, outputSize, "G1 X%.3f Y%.3f Z%.3f %s", absX, absY, absZ, feedToken);
@@ -184,10 +184,9 @@ bool buildAbsoluteG1FromRelative(const char* payload, char* output, size_t outpu
     snprintf(output, outputSize, "G1 X%.3f Y%.3f Z%.3f", absX, absY, absZ);
   }
 
-  objectPoses[currentObjectIndex].x = absX;
-  objectPoses[currentObjectIndex].y = absY;
-  objectPoses[currentObjectIndex].heading = absZ;
-  gcodeObjects[currentObjectIndex].loadPose(absX, absY, absZ);
+  currentPose.x = absX;
+  currentPose.y = absY;
+  currentPose.heading = absZ;
 
   Serial.printf("(MQTTcallback) Pose update old:(%.3f, %.3f, %.3f) rel:(%.3f, %.3f, %.3f) new:(%.3f, %.3f, %.3f) feed:%s\n",
                 oldX,
@@ -304,8 +303,10 @@ boolean  subscribeTopics()
   // subscribe to the RFID reporter topic for identifying GCode objects as they pass the RFID reader
   client.subscribe(RFIDReporterTopic);
   client.subscribe(GCodeDriverG1Topic);
-  client.subscribe(GCodeObjectIndexTopic);
-
+  client.subscribe(GCodeDriverSpeedTopic);
+  client.subscribe(GCodeDriverHomeTopic);
+  client.subscribe(GCodeDriverLockTopic);
+  client.subscribe(GCodeDriverUnlockTopic);
   return(true);
 }
 
@@ -415,40 +416,9 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length)
     GCodeObjectRFIDReporter(rfidPayload);
 
   }
-  else if (strncmp(topic, GCodeObjectIndexTopic, strlen(GCodeObjectIndexTopic)) == 0)
-  {
-    // This is a GCode Object Index topic, called to pass a manually selected object index to the controller
-    char indexPayload[12];
-    size_t copyLen = length;
-    if (copyLen > (sizeof(indexPayload) - 1))
-    {
-      copyLen = sizeof(indexPayload) - 1;
-    }
-
-    memcpy(indexPayload, payload, copyLen);
-    indexPayload[copyLen] = '\0';
-
-    char* parseEnd = nullptr;
-    long requestedIndex = strtol(indexPayload, &parseEnd, 10);
-    if ((parseEnd == indexPayload) || (*parseEnd != '\0'))
-    {
-      Serial.print("(MQTTcallback) Invalid object index payload:");
-      Serial.println(indexPayload);
-    }
-    else if (setCurrentObjectIndex(static_cast<int>(requestedIndex)))
-    {
-      Serial.print("(MQTTcallback) Current object index set to:");
-      Serial.println(static_cast<int>(requestedIndex));
-    }
-    else
-    {
-      Serial.print("(MQTTcallback) Object index out of range:");
-      Serial.println(static_cast<int>(requestedIndex));
-    }
-  }
     else if (strncmp(topic, GCodeDriverG1Topic, strlen(GCodeDriverG1Topic)) == 0) 
   {
-    // This is a GCode Driver G1 topic
+    // This is a GCode Driver G1 topic (which is used to move the GCode object in a relative manner), payload is the G1 command to send to the Marlin driver
     char gcodePayload[128];
     size_t copyLen = length;
     if (copyLen > (sizeof(gcodePayload) - 1))
@@ -476,6 +446,48 @@ Serial.println(gcodePayload);
     //Serial.print("(MQTTcallback) GCode Driver G1 event:");
     //Serial.println(gcodePayload);
   }
+  else if (strncmp(topic, GCodeDriverSpeedTopic, strlen(GCodeDriverSpeedTopic)) == 0) 
+  {
+    // This is a GCode Driver Speed topic, payload is the speed value to set for GCode movement
+    char gcodePayload[128];
+    size_t copyLen = length;
+    if (copyLen > (sizeof(gcodePayload) - 1))
+    {
+      copyLen = sizeof(gcodePayload) - 1;
+    }
+
+    memcpy(gcodePayload, payload, copyLen);
+    gcodePayload[copyLen] = '\0';
+Serial.print("(MQTTcallback) GCode Driver Speed event:");
+Serial.println(gcodePayload);
+
+    int speed = atoi(gcodePayload);
+    setSpeed(speed);
+  }
+  else if (strncmp(topic, GCodeDriverHomeTopic, strlen(GCodeDriverHomeTopic)) == 0) 
+  {
+    // This is a GCode Driver Home topic
+
+    Serial.println("(MQTTcallback) GCode Driver Home event");
+    sendGCodeFile("/home.gcode");
+
+  }
+  else if (strncmp(topic, GCodeDriverLockTopic, strlen(GCodeDriverLockTopic)) == 0) 
+  {
+    // This is a GCode Driver Lock topic, payload is the lock value to set for GCode movement
+
+    Serial.println("(MQTTcallback) GCode Driver Lock event");
+    sendGCodeFile("/lock.gcode");
+  }
+  else if (strncmp(topic, GCodeDriverUnlockTopic, strlen(GCodeDriverUnlockTopic)) == 0) 
+  {
+    // This is a GCode Driver Unlock topic, payload is the unlock value to set for GCode movement
+
+    Serial.println("(MQTTcallback) GCode Driver Unlock event");
+    sendGCodeFile("/unlock.gcode");
+
+  }
+
   else if (strncmp(topic, soundControlTopic, 12) == 0) 
   {
     // This is a Sound topic

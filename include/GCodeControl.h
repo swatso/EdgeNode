@@ -6,11 +6,10 @@
 
 void initGCodeControl(uint32_t baud = 250000, int8_t rxPin = 22, int8_t txPin = 23);
 void MarlinSender(const char* line);
-bool sendGCodeFile(const char* filePath, bool reverse = false);
+bool sendGCodeFile(const char* filePath);
 bool sendGCodeFileList(const char* listFilePath);
 void GCodeObjectRFIDReporter(const char* rfidTag);
 void loadGCodeObject();
-bool setCurrentObjectIndex(int newIndex);
 
 class GCodeObject
 {
@@ -52,5 +51,7 @@ public:
 extern GCodeObject gcodeObjects[kObjectCount]; // Array to hold up to 16 GCode objects
 extern Pose objectPoses[kObjectCount];
 extern int currentObjectIndex;
+extern Pose currentPose;
 extern void loadGCodeObject(int index);
+void setSpeed(int speed);
 #endif // GCODECONTROL_H

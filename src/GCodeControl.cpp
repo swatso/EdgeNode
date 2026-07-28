@@ -10,7 +10,9 @@
 #include "freertos/semphr.h"
 
 //#define MarlinDebug
-//#define PrintMarlinLines
+#define PrintMarlinLines
+
+Pose currentPose = {0.0F, 0.0F, 90.0F};
 
 namespace {
 MQTTMessagePayload marlinLinePayload;
@@ -28,17 +30,7 @@ constexpr uint32_t kMarlinAckTimeoutMs = 6000;
 constexpr uint32_t kMarlinExecutionWaitTimeoutMs = 30000;
 constexpr TickType_t kMarlinWaitSliceTicks = pdMS_TO_TICKS(20);
 
-TaskHandle_t posePersistenceTaskHandle = nullptr;
 SemaphoreHandle_t marlinSendMutex = nullptr;
-Pose lastPersistedPoses[kObjectCount];
-bool hasLastPersistedPose[kObjectCount] = {false};
-
-bool posesAreDifferent(const Pose& a, const Pose& b)
-{
-  return (fabsf(a.x - b.x) > kPoseCompareEpsilon)
-      || (fabsf(a.y - b.y) > kPoseCompareEpsilon)
-      || (fabsf(a.heading - b.heading) > kPoseCompareEpsilon);
-}
 
 bool waitForMarlinCommandCompletion(const char* context, uint32_t timeoutMs = kMarlinExecutionWaitTimeoutMs)
 {
@@ -89,133 +81,6 @@ float clampf(float value, float minValue, float maxValue)
     return maxValue;
   }
   return value;
-}
-
-void buildPoseFilePath(int objectIndex, char* pathBuffer, size_t pathBufferSize)
-{
-  if ((pathBuffer == nullptr) || (pathBufferSize == 0))
-  {
-    return;
-  }
-
-  snprintf(pathBuffer, pathBufferSize, "/pose%d.txt", objectIndex);
-}
-
-bool savePoseToFile(int objectIndex, const Pose& pose)
-{
-  if ((objectIndex < 0) || (objectIndex >= kObjectCount))
-  {
-    return false;
-  }
-
-  char path[20];
-  buildPoseFilePath(objectIndex, path, sizeof(path));
-
-  File poseFile = SPIFFS.open(path, FILE_WRITE);
-  if (!poseFile || poseFile.isDirectory())
-  {
-    localDebug.println("Failed to open pose file for write: " + String(path));
-    return false;
-  }
-
-  poseFile.printf("%.3f,%.3f,%.3f\n", pose.x, pose.y, pose.heading);
-  poseFile.close();
-  return true;
-}
-
-bool loadPoseFromFile(int objectIndex, Pose& pose)
-{
-  if ((objectIndex < 0) || (objectIndex >= kObjectCount))
-  {
-    return false;
-  }
-
-  char path[20];
-  buildPoseFilePath(objectIndex, path, sizeof(path));
-
-  File poseFile = SPIFFS.open(path, FILE_READ);
-  if (!poseFile || poseFile.isDirectory())
-  {
-    return false;
-  }
-
-  char line[64];
-  size_t len = poseFile.readBytesUntil('\n', line, sizeof(line) - 1);
-  line[len] = '\0';
-  poseFile.close();
-
-  if (len == 0)
-  {
-    return false;
-  }
-
-  float x = kDefaultObjectPose.x;
-  float y = kDefaultObjectPose.y;
-  float heading = kDefaultObjectPose.heading;
-
-  const int parsedCount = sscanf(line, "%f,%f,%f", &x, &y, &heading);
-  if (parsedCount < 3)
-  {
-    return false;
-  }
-
-  pose.x = x;
-  pose.y = y;
-  pose.heading = heading;
-  return true;
-}
-
-void posePersistenceTask(void*)
-{
-  int trackedObjectIndex = -1;
-  Pose trackedPose = kDefaultObjectPose;
-  uint32_t lastPoseChangeMs = 0;
-  bool pendingSave = false;
-
-  for (;;)
-  {
-    const int idx = currentObjectIndex;
-    if ((idx < 0) || (idx >= kObjectCount))
-    {
-      trackedObjectIndex = -1;
-      pendingSave = false;
-      vTaskDelay(kPoseMonitorIntervalTicks);
-      continue;
-    }
-
-    const Pose currentPose = objectPoses[idx];
-    const uint32_t nowMs = millis();
-
-    if (trackedObjectIndex != idx)
-    {
-      trackedObjectIndex = idx;
-      trackedPose = currentPose;
-      lastPoseChangeMs = nowMs;
-      pendingSave = true;
-    }
-    else if (posesAreDifferent(currentPose, trackedPose))
-    {
-      trackedPose = currentPose;
-      lastPoseChangeMs = nowMs;
-      pendingSave = true;
-    }
-
-    if (pendingSave && ((nowMs - lastPoseChangeMs) >= kPoseStableSaveMs))
-    {
-      if (!hasLastPersistedPose[idx] || posesAreDifferent(currentPose, lastPersistedPoses[idx]))
-      {
-        if (savePoseToFile(idx, currentPose))
-        {
-          lastPersistedPoses[idx] = currentPose;
-          hasLastPersistedPose[idx] = true;
-          localDebug.println("Saved stable pose for object " + String(idx));
-        }
-      }
-      pendingSave = false;
-    }
-
-    vTaskDelay(kPoseMonitorIntervalTicks);
-  }
 }
 
 void normalizeRFIDTag(const char* input, char* output, size_t outputSize)
@@ -308,30 +173,12 @@ bool parsePoseFromG1Line(char* line, float& x, float& y, float& bearing)
 }
 }
 
-namespace {
-void syncObjectPose(int objectIndex, float x, float y, float bearing)
-{
-  if ((objectIndex < 0) || (objectIndex >= kObjectCount))
-  {
-    return; 
-  }
-
-  const float clampedX = clampf(x, kPoseMinX, kPoseMaxX);
-  const float clampedY = clampf(y, kPoseMinY, kPoseMaxY);
-
-  objectPoses[objectIndex].x = clampedX;
-  objectPoses[objectIndex].y = clampedY;
-  objectPoses[objectIndex].heading = bearing;
-  gcodeObjects[objectIndex].loadPose(clampedX, clampedY, bearing);
-}
-}
-
 GCodeObject gcodeObjects[kObjectCount];
-Pose objectPoses[kObjectCount];
-int currentObjectIndex = -1;
-int RFIDObjectIndex = -1;
 
+// Forward declarations
 void updatePoseFromLine(char* line);
+
+int RFIDObjectIndex = -1;
 
 void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
 {
@@ -348,22 +195,6 @@ void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
       Serial.println("[initGCodeControl] ERROR: failed to create marlinSendMutex");
 #endif
     }
-  }
-
-  // Initialize object poses from SPIFFS where available, otherwise use defaults.
-  for (int i = 0; i < kObjectCount; ++i)
-  {
-    Pose loadedPose = kDefaultObjectPose;
-    if (!loadPoseFromFile(i, loadedPose))
-    {
-      loadedPose = kDefaultObjectPose;
-    }
-
-    objectPoses[i] = loadedPose;
-    syncObjectPose(i, loadedPose.x, loadedPose.y, loadedPose.heading);
-    gcodeObjects[i].setCollisionRadius(0);
-    lastPersistedPoses[i] = loadedPose;
-    hasLastPersistedPose[i] = true;
   }
 
   gcodeObjects[0].setName("Tarmac Layer");
@@ -399,75 +230,17 @@ void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
   gcodeObjects[15].setName("ShedB-door");
   gcodeObjects[15].setRFIDTag("00EEEC76");
 
-  if (posePersistenceTaskHandle == nullptr)
-  {
-    xTaskCreatePinnedToCore(posePersistenceTask,
-                            "PosePersist",
-                            3072,
-                            nullptr,
-                            1,
-                            &posePersistenceTaskHandle,
-                            1);
-  }
-
   // Home the machine to establish correct coordinates before sending any G-code files
   sendGCodeFile("/home.gcode");
-  // Select object 0 as the default starting object
-  setCurrentObjectIndex(0);
 }
 
-bool setCurrentObjectIndex(int newIndex)
+void setSpeed(int speed)
 {
-  // Single point of entry to change the current object index, 
-  // ensuring that the pose is saved before switching.
-  
-  if ((newIndex < 0) || (newIndex >= kObjectCount))
-  {
-    return false;
-  }
-
-  // De-select the previous object if any
-  if ((currentObjectIndex >= 0) && (currentObjectIndex < kObjectCount))
-  {
-    for (size_t i = 0; i < (sizeof(kObjectDeselectGCode) / sizeof(kObjectDeselectGCode[0])); ++i)
-    {
-      MarlinSender(kObjectDeselectGCode[i]);
-    }
-    // save its pose before switching to the new object
-    syncObjectPose(currentObjectIndex,
-             gcodeObjects[currentObjectIndex].pose.x,
-             gcodeObjects[currentObjectIndex].pose.y,
-             gcodeObjects[currentObjectIndex].pose.heading);
-
-    if (savePoseToFile(currentObjectIndex, objectPoses[currentObjectIndex]))
-    {
-      lastPersistedPoses[currentObjectIndex] = objectPoses[currentObjectIndex];
-      hasLastPersistedPose[currentObjectIndex] = true;
-      localDebug.println("Saved pose while switching away from object " + String(currentObjectIndex));
-    }
-  }
-
-  currentObjectIndex = newIndex;
-//  syncObjectPose(newIndex, objectPoses[newIndex].x, objectPoses[newIndex].y, objectPoses[newIndex].heading);
-
-
-  //Send the G-code to move to the new object's pose
-  char gcodeLine[128];
-  snprintf(gcodeLine, sizeof(gcodeLine), "G1 X%.3f Y%.3f Z%.3f", objectPoses[newIndex].x, objectPoses[newIndex].y, objectPoses[newIndex].heading);
+  char gcodeLine[50];
+  Serial.print("(setSpeed) speed:");
+  Serial.println(speed);
+  snprintf(gcodeLine, sizeof(gcodeLine), "G1 E0 F%d", speed);
   MarlinSender(gcodeLine);
-
-  // Send the G-code to select the new object
-  for (size_t i = 0; i < (sizeof(kObjectSelectGCode) / sizeof(kObjectSelectGCode[0])); ++i)
-  {
-    MarlinSender(kObjectSelectGCode[i]);
-  }
-
-  // Re-publish the resolved pose as the final reporter line for this selection.
-  // This guarantees MQTT pose consumers receive an explicit pose update on select.
-  strncpy(marlinLinePayload.message, gcodeLine, sizeof(marlinLinePayload.message) - 1);
-  marlinLinePayload.message[sizeof(marlinLinePayload.message) - 1] = '\0';
-  MQTTPublishMessage(marlinLinePayload);
-return true;
 }
 
 void MarlinSender(const char* line) {
@@ -558,6 +331,7 @@ void MarlinSender(const char* line) {
   marlinLinePayload.message[sizeof(marlinLinePayload.message) - 1] = '\0';
   MQTTPublishMessage(marlinLinePayload);
 #ifdef PrintMarlinLines
+  Serial.print("[MarlinSender] sent line: ");
   Serial.println(line);
 #endif
 
@@ -574,7 +348,7 @@ void MarlinSender(const char* line) {
   xSemaphoreGive(marlinSendMutex);
 }
 
-bool sendGCodeFile(const char* filePath, bool reverse)
+bool sendGCodeFile(const char* filePath)
 {
   if ((filePath == nullptr) || (filePath[0] == '\0'))
   {
@@ -584,7 +358,7 @@ bool sendGCodeFile(const char* filePath, bool reverse)
   }
 
 #ifdef MarlinDebug
-  Serial.printf("[sendGCodeFile] START file='%s' reverse=%s\n", filePath, reverse ? "true" : "false");
+  Serial.printf("[sendGCodeFile] START file='%s'\n", filePath);
 #endif
 
   File gcodeFile = SPIFFS.open(filePath, FILE_READ);
@@ -672,84 +446,12 @@ bool sendGCodeFile(const char* filePath, bool reverse)
     ++sentLines;
   };
 
-  if (!reverse)
+  while (gcodeFile.available())
   {
-    while (gcodeFile.available())
-    {
-      ++fileLineNumber;
-      size_t len = gcodeFile.readBytesUntil('\n', lineBuffer, sizeof(lineBuffer) - 1);
-      lineBuffer[len] = '\0';
-      processLine(lineBuffer);
-    }
-  }
-  else
-  {
-    size_t endPos = gcodeFile.size();
-
-    while (endPos > 0)
-    {
-      while (endPos > 0)
-      {
-        if (!gcodeFile.seek(endPos - 1, SeekSet))
-        {
-          gcodeFile.close();
-          Serial.println("Failed to seek while reading G-code in reverse");
-          return false;
-        }
-
-        const int c = gcodeFile.read();
-        if ((c == '\n') || (c == '\r'))
-        {
-          --endPos;
-          continue;
-        }
-        break;
-      }
-
-      if (endPos == 0)
-      {
-        break;
-      }
-
-      size_t startPos = endPos;
-      while (startPos > 0)
-      {
-        if (!gcodeFile.seek(startPos - 1, SeekSet))
-        {
-          gcodeFile.close();
-          Serial.println("Failed to seek while finding reverse line start");
-          return false;
-        }
-
-        const int c = gcodeFile.read();
-        if ((c == '\n') || (c == '\r'))
-        {
-          break;
-        }
-        --startPos;
-      }
-
-      ++fileLineNumber;
-      const size_t bytesToRead = endPos - startPos;
-      size_t copyLen = bytesToRead;
-      if (copyLen > (sizeof(lineBuffer) - 1))
-      {
-        copyLen = sizeof(lineBuffer) - 1;
-      }
-
-      if (!gcodeFile.seek(startPos, SeekSet))
-      {
-        gcodeFile.close();
-        Serial.println("Failed to seek while reading reverse line content");
-        return false;
-      }
-
-      const size_t readLen = gcodeFile.readBytes(lineBuffer, copyLen);
-      lineBuffer[readLen] = '\0';
-      processLine(lineBuffer);
-
-      endPos = startPos;
-    }
+    ++fileLineNumber;
+    size_t len = gcodeFile.readBytesUntil('\n', lineBuffer, sizeof(lineBuffer) - 1);
+    lineBuffer[len] = '\0';
+    processLine(lineBuffer);
   }
 
   gcodeFile.close();
@@ -853,19 +555,21 @@ void updatePoseFromLine(char* line)
     return;
   }
 
-  if ((currentObjectIndex < 0) || (currentObjectIndex >= kObjectCount))
-  {
-    return;
-  }
+  float x = ::currentPose.x;
+  float y = ::currentPose.y;
+  float bearing = ::currentPose.heading;
 
-  float x = objectPoses[currentObjectIndex].x;
-  float y = objectPoses[currentObjectIndex].y;
-  float bearing = objectPoses[currentObjectIndex].heading;
-
+  /*
   if (parsePoseFromG1Line(line, x, y, bearing))
   {
     syncObjectPose(currentObjectIndex, x, y, bearing);
   }
+    */
+   parsePoseFromG1Line(line, x, y, bearing);
+
+  ::currentPose.x = x;
+  ::currentPose.y = y;
+  ::currentPose.heading = bearing;
 }
 
 
@@ -891,7 +595,6 @@ void GCodeObjectRFIDReporter(const char* rfidTag)
     {
       snprintf(message, sizeof(message), "Matched GCode object: %s at (%.2f, %.2f) bearing %.2f", gcodeObjects[i].name, gcodeObjects[i].pose.x, gcodeObjects[i].pose.y, gcodeObjects[i].pose.heading);
       localDebug.println(message);
-      //setCurrentObjectIndex(i);
       RFIDObjectIndex = i;
       break;
     }
@@ -902,23 +605,13 @@ void loadGCodeObject()
 {
   // This function is invoked by the user (typically via an MQTT event or by pressing a pushbutton)
   // It performs the following actions:
-  //   1. Saves the current object index and pose so they can be restored on failure.
-  //   2. Streams pathRFID1 to home the puck and move the object past the RFID reader.
-  //   3. If the RFID reader detected the object, streams pathRFID3 to home the puck.
+  //   1. Streams pathRFID1 to home the puck and move the object past the RFID reader.
+  //   2. If the RFID reader detected the object, streams pathRFID3 to home the puck.
   //      Otherwise, streams pathRFID2 to move the object closer to the RFID reader.
-  //   4. If an object was detected:
-  //        - Selects it as the current object (via setCurrentObjectIndex).
+  //   3. If an object was detected:
   //        - Resets its pose to the known loaded position (0, 0, heading 90).
   //        - Sends the start-of-day G-code file to move it to its starting position.
-  //   5. If no object was detected, restores the previous object selection and pose.
 
-  // Save pre-load state so we can restore it on failure.
-  const int previousObjectIndex = currentObjectIndex;
-  const Pose previousPose = (previousObjectIndex >= 0 && previousObjectIndex < kObjectCount)
-                              ? objectPoses[previousObjectIndex]
-                              : kDefaultObjectPose;
-
-  RFIDObjectIndex = -1; // reset to indicate no object is currently being loaded
   RFIDEnable = true;    // enable the RFID reader to detect the object
 
   sendGCodeFile("/pathRFID1.gcode");
@@ -941,8 +634,6 @@ void loadGCodeObject()
   if (RFIDObjectIndex != -1)
   {
     // Object successfully identified — select it and move it to its starting position.
-    setCurrentObjectIndex(RFIDObjectIndex);
-    syncObjectPose(RFIDObjectIndex, 0, 0, 90);
     localDebug.println("Loaded GCode object: " + String(gcodeObjects[RFIDObjectIndex].name));
 
     char startOfDayFile[32];
@@ -951,28 +642,15 @@ void loadGCodeObject()
   }
   else
   {
-    // No object detected — restore the previous selection and pose.
+    // No object detected
     localDebug.println("No object detected; restoring previous object selection");
-
-    if (previousObjectIndex >= 0 && previousObjectIndex < kObjectCount)
-    {
-      setCurrentObjectIndex(previousObjectIndex);
-      syncObjectPose(previousObjectIndex, previousPose.x, previousPose.y, previousPose.heading);
-      savePoseToFile(previousObjectIndex, previousPose);
-      lastPersistedPoses[previousObjectIndex] = previousPose;
-      hasLastPersistedPose[previousObjectIndex] = true;
-    }
   }
 }
 
 void loadGCodeObject(int index)
 {
   // select object and move it to its starting position.
-  syncObjectPose(index, 0, 0, 90);
-  setCurrentObjectIndex(index);
-//  syncObjectPose(index, 0, 0, 90);
   localDebug.println("Loaded GCode object: " + String(gcodeObjects[index].name));
-
   char startOfDayFile[32];
   snprintf(startOfDayFile, sizeof(startOfDayFile), "/Path%d.0.gcode", index);
   sendGCodeFile(startOfDayFile);
