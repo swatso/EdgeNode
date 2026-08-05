@@ -448,7 +448,7 @@ Serial.println(gcodePayload);
   }
   else if (strncmp(topic, GCodeDriverSpeedTopic, strlen(GCodeDriverSpeedTopic)) == 0) 
   {
-    // This is a GCode Driver Speed topic, payload is the speed value to set for GCode movement
+    // This is a GCode Driver Speed topic, payload is the speed % value to set for GCode movement
     char gcodePayload[128];
     size_t copyLen = length;
     if (copyLen > (sizeof(gcodePayload) - 1))
@@ -462,7 +462,7 @@ Serial.print("(MQTTcallback) GCode Driver Speed event:");
 Serial.println(gcodePayload);
 
     int speed = atoi(gcodePayload);
-    setSpeed(speed);
+    setSpeedPercent(speed);
   }
   else if (strncmp(topic, GCodeDriverHomeTopic, strlen(GCodeDriverHomeTopic)) == 0) 
   {

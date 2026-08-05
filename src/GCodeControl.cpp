@@ -19,17 +19,18 @@ MQTTMessagePayload marlinLinePayload;
 HardwareSerial gcodeUart(1);  // UART1 (use 1 or 2 typically)
 MarlinHandshake<> handshake(gcodeUart);
 bool RFIDEnable = false; // Flag to enable or disable RFID reporting
-constexpr uint32_t kPoseStableSaveMs = 5000;
-constexpr TickType_t kPoseMonitorIntervalTicks = pdMS_TO_TICKS(500);
+//constexpr uint32_t kPoseStableSaveMs = 5000;
+//constexpr TickType_t kPoseMonitorIntervalTicks = pdMS_TO_TICKS(500);
 constexpr float kPoseCompareEpsilon = 0.001F;
 constexpr float kPoseMinX = 0.0F;
 constexpr float kPoseMaxX = 265.0F;
 constexpr float kPoseMinY = 0.0F;
 constexpr float kPoseMaxY = 225.0F;
-constexpr uint32_t kMarlinAckTimeoutMs = 6000;
+//constexpr uint32_t kMarlinAckTimeoutMs = 6000;
+constexpr uint32_t kMarlinAckTimeoutMs = 600000;
 constexpr uint32_t kMarlinExecutionWaitTimeoutMs = 30000;
 constexpr TickType_t kMarlinWaitSliceTicks = pdMS_TO_TICKS(20);
-
+int currentSpeedPercent = 100; // Default speed percentage for GCode movement
 SemaphoreHandle_t marlinSendMutex = nullptr;
 
 bool waitForMarlinCommandCompletion(const char* context, uint32_t timeoutMs = kMarlinExecutionWaitTimeoutMs)
@@ -236,10 +237,24 @@ void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
 
 void setSpeed(int speed)
 {
+  // Sets the feedrate for G-code movement. The speed is specified in mm/min.
   char gcodeLine[50];
   Serial.print("(setSpeed) speed:");
   Serial.println(speed);
   snprintf(gcodeLine, sizeof(gcodeLine), "G1 E0 F%d", speed);
+  setSpeedPercent(currentSpeedPercent); // Ensure the speed percentage is applied after setting the feedrate
+  MarlinSender(gcodeLine);
+}
+
+void setSpeedPercent(int speed)
+{
+  // Sets the feedrate for G-code movement. 
+  // The speed is specified as a percentage of the current feedrate.
+  char gcodeLine[50];
+  Serial.print("(setSpeedPercent) speed%:");
+  Serial.println(speed);
+  snprintf(gcodeLine, sizeof(gcodeLine), "M220 S%d", speed);
+  currentSpeedPercent = speed; // Update the current speed percentage
   MarlinSender(gcodeLine);
 }
 
@@ -272,9 +287,9 @@ void MarlinSender(const char* line) {
     return;
   }
 
-#ifdef MarlinDebug
-  Serial.printf("[MarlinSender] begin line='%s'\n", line);
-#endif
+
+  Serial.printf("[MarlinSender] begin line='%s'    ", line);
+
 
   const uint32_t waitStartMs = millis();
   uint32_t lastWaitLogMs = waitStartMs;
@@ -612,6 +627,7 @@ void loadGCodeObject()
   //        - Resets its pose to the known loaded position (0, 0, heading 90).
   //        - Sends the start-of-day G-code file to move it to its starting position.
 
+  RFIDObjectIndex = -1;
   RFIDEnable = true;    // enable the RFID reader to detect the object
 
   sendGCodeFile("/pathRFID1.gcode");
