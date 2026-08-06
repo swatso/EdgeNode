@@ -72,7 +72,7 @@
             <tr>
               <td width="10%"><span id="index${i}">...</span></td>
               <td width="60%"><span id="name${i}">-Loading</span></td>
-              <td width="30%"><button type="button" onclick="launchReload(${i})">ReLoad</button></td>
+              <td width="30%"><button type="button" onclick="launchRun(${i})">Run</button></td>
             </tr>
           `);
         }
@@ -98,8 +98,24 @@
         }
       }
 
-      async function launchReload(index) {
-        await postJson("/api/object/reload", { index: index });
+      async function launchRun(index) {
+        const pathInput = window.prompt(`Enter path number for object ${index}:`, "0");
+        if (pathInput === null) {
+          return;
+        }
+
+        const path = Number(pathInput);
+        if (!Number.isInteger(path) || path < 0) {
+          setPageError("Path must be a non-negative integer.");
+          return;
+        }
+
+        try {
+          await postJson("/api/object/run", { index: index, path: path });
+          setPageError("");
+        } catch (error) {
+          setPageError(`Failed to run object ${index} path ${path}: ${error}`);
+        }
       }
 
       async function launchIdentify() {

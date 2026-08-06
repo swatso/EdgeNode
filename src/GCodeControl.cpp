@@ -363,6 +363,31 @@ void MarlinSender(const char* line) {
   xSemaphoreGive(marlinSendMutex);
 }
 
+bool runPath(int obj, int path)
+{
+  if ((obj < 0) || (path < 0))
+  {
+    Serial.printf("[runPath] ERROR: invalid args obj=%d path=%d\n", obj, path);
+    return false;
+  }
+
+  char selectPathLine[64];
+  snprintf(selectPathLine, sizeof(selectPathLine), "M23 OBJ_%d/PATH_%d.GCO", obj, path);
+
+  MarlinSender("M21");
+  MarlinSender(selectPathLine);
+  MarlinSender("M24");
+  MarlinSender("M400");
+
+  if (!waitForMarlinCommandCompletion("runPath/M400"))
+  {
+    Serial.printf("[runPath] ERROR: timed out waiting for path completion obj=%d path=%d\n", obj, path);
+    return false;
+  }
+
+  return true;
+}
+
 bool sendGCodeFile(const char* filePath)
 {
   if ((filePath == nullptr) || (filePath[0] == '\0'))

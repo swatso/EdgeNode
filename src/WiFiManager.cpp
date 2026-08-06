@@ -35,24 +35,31 @@ const char* PARAM_INPUT_3 = "hostName";
 AsyncWebServer server(80);
 
 namespace {
-QueueHandle_t objectReloadQueue = nullptr;
+QueueHandle_t objectRunQueue = nullptr;
 QueueHandle_t objectIdentifyQueue = nullptr;
 constexpr size_t kJsonResponseBufferSize = 256;
 constexpr int kGpioCount = 16;
 constexpr int kTrackCount = 16;
 constexpr int kActionCount = 16;
 
-void objectReloadTask(void*);
+struct ObjectRunRequest
+{
+  int index;
+  int path;
+};
+
+void objectRunTask(void*);
 void objectIdentifyTask(void*);
 
-bool queueObjectReload(int index)
+bool queueObjectRun(int index, int path)
 {
-  if (objectReloadQueue == nullptr)
+  if (objectRunQueue == nullptr)
   {
     return false;
   }
 
-  return xQueueOverwrite(objectReloadQueue, &index) == pdTRUE;
+  const ObjectRunRequest request = {index, path};
+  return xQueueOverwrite(objectRunQueue, &request) == pdTRUE;
 }
 
 bool queueObjectIdentify()
@@ -67,24 +74,37 @@ bool queueObjectIdentify()
 }
 
 
-void objectReloadTask(void*)
+void objectRunTask(void*)
 {
-  int index = -1;
+  ObjectRunRequest request = {-1, -1};
 
   for (;;)
   {
-    if (xQueueReceive(objectReloadQueue, &index, portMAX_DELAY) == pdTRUE)
+    if (xQueueReceive(objectRunQueue, &request, portMAX_DELAY) == pdTRUE)
     {
-      if ((index < 0) || (index >= kObjectCount))
+      if ((request.index < 0) || (request.index >= kObjectCount))
       {
-        Serial.print("Invalid object reload index: ");
-        Serial.println(index);
+        Serial.print("Invalid object run index: ");
+        Serial.println(request.index);
         continue;
       }
 
-      Serial.print("reload object: ");
-      Serial.println(index);
-      loadGCodeObject(index);
+      if (request.path < 0)
+      {
+        Serial.print("Invalid object run path: ");
+        Serial.println(request.path);
+        continue;
+      }
+
+      Serial.print("run object: ");
+      Serial.print(request.index);
+      Serial.print(" path: ");
+      Serial.println(request.path);
+
+      if (!runPath(request.index, request.path))
+      {
+        Serial.println("runPath failed");
+      }
     }
   }
 }
@@ -227,13 +247,13 @@ void setupWiFi()
 {
   if(initWiFi()) 
   {
-    if (objectReloadQueue == nullptr)
+    if (objectRunQueue == nullptr)
     {
-      objectReloadQueue = xQueueCreate(1, sizeof(int));
-      if (objectReloadQueue != nullptr)
+      objectRunQueue = xQueueCreate(1, sizeof(ObjectRunRequest));
+      if (objectRunQueue != nullptr)
       {
-        xTaskCreatePinnedToCore(objectReloadTask,
-                                "ObjectReload",
+        xTaskCreatePinnedToCore(objectRunTask,
+                                "ObjectRun",
                                 4096,
                                 nullptr,
                                 1,
@@ -242,7 +262,7 @@ void setupWiFi()
       }
       else
       {
-        Serial.println("Failed to create objectReloadQueue");
+        Serial.println("Failed to create objectRunQueue");
       }
     }
 
@@ -796,7 +816,7 @@ void setupWiFi()
       }
 
 
-      if (request->url() == "/api/object/reload") 
+      if (request->url() == "/api/object/run") 
       {
           JsonDocument doc;
           DeserializationError error = deserializeJson(doc, (const char*)data);
@@ -807,9 +827,10 @@ void setupWiFi()
           else
           {
             int index = (int) doc["index"];
-            if (!queueObjectReload(index))
+            int path = (int) doc["path"];
+            if (!queueObjectRun(index, path))
             {
-              Serial.println("Failed to queue object reload");
+              Serial.println("Failed to queue object run");
             }
           }
       }

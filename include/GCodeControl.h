@@ -7,6 +7,7 @@
 void initGCodeControl(uint32_t baud = 250000, int8_t rxPin = 22, int8_t txPin = 23);
 void setSpeedPercent(int speed);
 void MarlinSender(const char* line);
+bool runPath(int obj, int path);
 bool sendGCodeFile(const char* filePath);
 bool sendGCodeFileList(const char* listFilePath);
 void GCodeObjectRFIDReporter(const char* rfidTag);
