@@ -14,8 +14,10 @@
 template <size_t RxBufferSize = 96>
 class MarlinHandshake {
  public:
-  explicit MarlinHandshake(HardwareSerial& cncSerial, Stream* debugStream = nullptr)
-      : cncSerial_(cncSerial), debugStream_(debugStream) {
+  using LineHandler = void (*)(const char* line);
+
+  explicit MarlinHandshake(HardwareSerial& cncSerial, Stream* debugStream = nullptr, LineHandler lineHandler = nullptr)
+      : cncSerial_(cncSerial), debugStream_(debugStream), lineHandler_(lineHandler) {
     reset();
   }
 
@@ -87,6 +89,8 @@ class MarlinHandshake {
         --commandsInFlight_;
       }
       ++okResponsesPending_;
+    } else if (lineHandler_ != nullptr) {
+      lineHandler_(line);
     }
   }
 
@@ -97,5 +101,6 @@ class MarlinHandshake {
   uint16_t commandsInFlight_ = 0;
   uint16_t okResponsesPending_ = 0;
   uint32_t lastCommandSentMs_ = 0;
+  LineHandler lineHandler_ = nullptr;
 };
 

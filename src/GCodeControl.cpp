@@ -8,6 +8,7 @@
 #include <SPIFFS.h>
 #include <cstring>
 #include "freertos/semphr.h"
+#include "freertos/task.h"
 
 //#define MarlinDebug
 #define PrintMarlinLines
@@ -17,7 +18,8 @@ Pose currentPose = {0.0F, 0.0F, 90.0F};
 namespace {
 MQTTMessagePayload marlinLinePayload;
 HardwareSerial gcodeUart(1);  // UART1 (use 1 or 2 typically)
-MarlinHandshake<> handshake(gcodeUart);
+void handleMarlinFeedbackLine(const char* line);
+MarlinHandshake<> handshake(gcodeUart, nullptr, handleMarlinFeedbackLine);
 bool RFIDEnable = false; // Flag to enable or disable RFID reporting
 //constexpr uint32_t kPoseStableSaveMs = 5000;
 //constexpr TickType_t kPoseMonitorIntervalTicks = pdMS_TO_TICKS(500);
@@ -30,8 +32,10 @@ constexpr float kPoseMaxY = 225.0F;
 constexpr uint32_t kMarlinAckTimeoutMs = 600000;
 constexpr uint32_t kMarlinExecutionWaitTimeoutMs = 30000;
 constexpr TickType_t kMarlinWaitSliceTicks = pdMS_TO_TICKS(20);
+constexpr TickType_t kMarlinInputPollTicks = pdMS_TO_TICKS(25);
 int currentSpeedPercent = 100; // Default speed percentage for GCode movement
 SemaphoreHandle_t marlinSendMutex = nullptr;
+TaskHandle_t marlinInputTaskHandle = nullptr;
 
 bool waitForMarlinCommandCompletion(const char* context, uint32_t timeoutMs = kMarlinExecutionWaitTimeoutMs)
 {
@@ -172,6 +176,116 @@ bool parsePoseFromG1Line(char* line, float& x, float& y, float& bearing)
 
   return isG1Line && (hasX || hasY || hasZ);
 }
+
+bool parsePoseFromM114Line(const char* line, float& x, float& y, float& bearing)
+{
+  if (line == nullptr)
+  {
+    return false;
+  }
+
+  const char* xToken = strstr(line, "X:");
+  const char* yToken = strstr(line, "Y:");
+  const char* zToken = strstr(line, "Z:");
+  if ((xToken == nullptr) || (yToken == nullptr) || (zToken == nullptr))
+  {
+    return false;
+  }
+
+  char* endPtr = nullptr;
+
+  const float parsedX = strtof(xToken + 2, &endPtr);
+  if (endPtr == (xToken + 2))
+  {
+    return false;
+  }
+
+  const float parsedY = strtof(yToken + 2, &endPtr);
+  if (endPtr == (yToken + 2))
+  {
+    return false;
+  }
+
+  const float parsedZ = strtof(zToken + 2, &endPtr);
+  if (endPtr == (zToken + 2))
+  {
+    return false;
+  }
+
+  x = parsedX;
+  y = parsedY;
+  bearing = parsedZ;
+  return true;
+}
+
+bool publishPoseAsG1(float x, float y, float bearing)
+{
+  MQTTMessagePayload posePayload;
+  strncpy(posePayload.topic, reporterTopic, sizeof(posePayload.topic) - 1);
+  posePayload.topic[sizeof(posePayload.topic) - 1] = '\0';
+  snprintf(posePayload.message, sizeof(posePayload.message), "G1 X%.3f Y%.3f Z%.3f", x, y, bearing);
+
+  if (MQTTMessageQueue == nullptr)
+  {
+    return false;
+  }
+
+  if (xQueueSend(MQTTMessageQueue, &posePayload, 0) != pdPASS)
+  {
+    Serial.println("[MarlinPose] WARNING: MQTT message queue full, pose not published");
+    return false;
+  }
+
+  return true;
+}
+
+void publishPoseIfChanged(float x, float y, float bearing)
+{
+  if ((fabsf(currentPose.x - x) <= kPoseCompareEpsilon) &&
+      (fabsf(currentPose.y - y) <= kPoseCompareEpsilon) &&
+      (fabsf(currentPose.heading - bearing) <= kPoseCompareEpsilon))
+  {
+    return;
+  }
+
+  currentPose.x = x;
+  currentPose.y = y;
+  currentPose.heading = bearing;
+
+  publishPoseAsG1(x, y, bearing);
+
+#ifdef PrintMarlinLines
+  Serial.printf("[MarlinPose] published pose G1 X%.3f Y%.3f Z%.3f\n", x, y, bearing);
+#endif
+}
+
+void handleMarlinFeedbackLine(const char* line)
+{
+  float x = currentPose.x;
+  float y = currentPose.y;
+  float bearing = currentPose.heading;
+
+  if (parsePoseFromM114Line(line, x, y, bearing))
+  {
+    publishPoseIfChanged(x, y, bearing);
+  }
+}
+
+void marlinInputTask(void* pvParameters)
+{
+  (void)pvParameters;
+
+  while (true)
+  {
+    if ((marlinSendMutex != nullptr) && (xSemaphoreTake(marlinSendMutex, pdMS_TO_TICKS(5)) == pdTRUE))
+    {
+      handshake.processInput();
+      xSemaphoreGive(marlinSendMutex);
+    }
+
+    vTaskDelay(kMarlinInputPollTicks);
+  }
+}
 }
 
 GCodeObject gcodeObjects[kObjectCount];
@@ -196,6 +310,11 @@ void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
       Serial.println("[initGCodeControl] ERROR: failed to create marlinSendMutex");
 #endif
     }
+  }
+
+  if (marlinInputTaskHandle == nullptr)
+  {
+    xTaskCreatePinnedToCore(marlinInputTask, "Marlin Input", 3072, nullptr, 1, &marlinInputTaskHandle, 1);
   }
 
   gcodeObjects[0].setName("Tarmac Layer");
@@ -384,7 +503,7 @@ bool runPath(int obj, int path)
     Serial.printf("[runPath] ERROR: timed out waiting for path completion obj=%d path=%d\n", obj, path);
     return false;
   }
-
+  MarlinSender("M114");
   return true;
 }
 
