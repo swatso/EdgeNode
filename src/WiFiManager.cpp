@@ -37,6 +37,7 @@ AsyncWebServer server(80);
 namespace {
 QueueHandle_t objectRunQueue = nullptr;
 QueueHandle_t objectIdentifyQueue = nullptr;
+QueueHandle_t sceneRunQueue = nullptr;
 constexpr size_t kJsonResponseBufferSize = 256;
 constexpr int kGpioCount = 16;
 constexpr int kTrackCount = 16;
@@ -48,8 +49,14 @@ struct ObjectRunRequest
   int path;
 };
 
+struct SceneRunRequest
+{
+  int index;
+};
+
 void objectRunTask(void*);
 void objectIdentifyTask(void*);
+void sceneRunTask(void*);
 
 bool queueObjectRun(int index, int path)
 {
@@ -73,6 +80,16 @@ bool queueObjectIdentify()
   return xQueueOverwrite(objectIdentifyQueue, &trigger) == pdTRUE;
 }
 
+bool queueSceneRunRequest(int index)
+{
+  if (sceneRunQueue == nullptr)
+  {
+    return false;
+  }
+
+  const SceneRunRequest request = {index};
+  return xQueueOverwrite(sceneRunQueue, &request) == pdTRUE;
+}
 
 void objectRunTask(void*)
 {
@@ -123,6 +140,37 @@ void objectIdentifyTask(void*)
     }
   }
 }
+
+void sceneRunTask(void*)
+{
+  SceneRunRequest request = {-1};
+
+  for (;;)
+  {
+    if (xQueueReceive(sceneRunQueue, &request, portMAX_DELAY) == pdTRUE)
+    {
+      if (request.index < 0)
+      {
+        Serial.print("Invalid scene run index: ");
+        Serial.println(request.index);
+        continue;
+      }
+
+      Serial.print("run scene: ");
+      Serial.println(request.index);
+
+      if (!runScene(request.index))
+      {
+        Serial.println("runScene failed");
+      }
+    }
+  }
+}
+}
+
+bool queueSceneRun(int index)
+{
+  return queueSceneRunRequest(index);
 }
 
 String brokerIP;
@@ -285,6 +333,25 @@ void setupWiFi()
       }
     }
 
+    if (sceneRunQueue == nullptr)
+    {
+      sceneRunQueue = xQueueCreate(1, sizeof(SceneRunRequest));
+      if (sceneRunQueue != nullptr)
+      {
+        xTaskCreatePinnedToCore(sceneRunTask,
+                                "SceneRun",
+                                4096,
+                                nullptr,
+                                1,
+                                nullptr,
+                                1);
+      }
+      else
+      {
+        Serial.println("Failed to create sceneRunQueue");
+      }
+    }
+
 //    Serial.println("initialising web server");
 
     // Route for /home web page
@@ -343,8 +410,16 @@ void setupWiFi()
 
     // Route for Objects web page
     server.on("/page/objects", HTTP_GET, [](AsyncWebServerRequest *request) {
-      //Serial.println("Serve objects.html");
-      request->send(SPIFFS, "/objects.html", "text/html", false);
+      Serial.println("Serve objects.html");
+      AsyncWebServerResponse *response = request->beginResponse(SPIFFS, "/objects.html", "text/html");
+      response->addHeader("Connection", "close");
+      request->send(response);
+    });
+
+    // Route for Scene web page
+    server.on("/page/scene", HTTP_GET, [](AsyncWebServerRequest *request) {
+      Serial.println("Serve scene.html");
+      request->send(SPIFFS, "/scene.html", "text/html", false);
     });
 
     // Route for /favicon
@@ -585,12 +660,301 @@ void setupWiFi()
     });
 
 
+    server.on("/api/object/run", HTTP_POST, [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObjectConst object = json.as<JsonObjectConst>();
+      const bool hasIndex = object.containsKey("index");
+      const bool hasPath = object.containsKey("path");
+
+      if (!hasIndex || !hasPath)
+      {
+        Serial.println("Deserialisationerror /api/object/run");
+        request->send(400, "application/json", "{\"error\":\"invalid object run payload\"}");
+        return;
+      }
+
+      const int index = object["index"].as<int>();
+      const int path = object["path"].as<int>();
+      if (!queueObjectRun(index, path))
+      {
+        Serial.println("Failed to queue object run");
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/object/identify", HTTP_POST, [](AsyncWebServerRequest *request) {
+      Serial.println("Received /api/object/identify POST request");
+      if (!queueObjectIdentify())
+      {
+        Serial.println("Failed to queue object identify");
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/scene/run", HTTP_POST, [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObjectConst object = json.as<JsonObjectConst>();
+      const bool hasIndex = object.containsKey("index");
+
+      if (!hasIndex)
+      {
+        Serial.println("Deserialisationerror /api/scene/run");
+        request->send(400, "application/json", "{\"error\":\"invalid scene run payload\"}");
+        return;
+      }
+
+      const int index = object["index"].as<int>();
+      if (!queueSceneRunRequest(index))
+      {
+        Serial.println("Failed to queue scene run");
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/node/restart", HTTP_POST, [](AsyncWebServerRequest *request) {
+      powerGPIO(false);
+      delay(1000);
+      ESP.restart();
+    });
+
+    server.on("/api/nodeid/value", HTTP_POST, [](AsyncWebServerRequest *request) {
+      String body = request->arg("plain");
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, body);
+      if (!error)
+      {
+        const char* nodeID = doc["value"].as<const char*>();
+        node.setNodeID(strtol(nodeID, nullptr, 16));
+        writeFile(SPIFFS, nodeIDPath, node.getNodeIDstring());
+      }
+      else
+      {
+        Serial.println("Deserialisationerror");
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/brokerip/value", HTTP_POST, [](AsyncWebServerRequest *request) {
+      String body = request->arg("plain");
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, body);
+      if (!error)
+      {
+        const char* buff = doc["value"].as<const char*>();
+        writeFile(SPIFFS, brokerIPPath, buff);
+        strcpy(node.brokerIP, buff);
+      }
+      else
+      {
+        Serial.println("Deserialisationerror");
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/gpio/config/bit", HTTP_POST, [](AsyncWebServerRequest *request) {
+      String body = request->arg("plain");
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, body);
+      if (!error)
+      {
+        uint8_t bit = (int)doc["bitNo"];
+        const char* buff = doc["name"].as<const char*>();
+        strcpy(gpio[bit].name, buff);
+        gpio[bit].alwaysWrite((int)doc["value"]);
+        gpio[bit].setType((int)doc["type"]);
+        gpio[bit].preset0 = (int)doc["preset0"];
+        gpio[bit].preset1 = (int)doc["preset1"];
+        gpio[bit].preset2 = (int)doc["preset2"];
+        gpio[bit].rate = (int)doc["rate"];
+        gpio[bit].enableRemote = doc["enableRemote"];
+        gpio[bit].enableLocal = doc["enableLocal"];
+        gpio[bit].setPublishRate((int)doc["publishRate"]);
+        gpio[bit].setEasingType((int)doc["easingType"]);
+        writeConfigFile(SPIFFS, bit);
+      }
+      else
+      {
+        Serial.println("Deserialisationerror");
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/soundtrack/config", HTTP_POST, [](AsyncWebServerRequest *request) {
+      String body = request->arg("plain");
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, body);
+      if (!error)
+      {
+        uint8_t trackNo = (int)doc["trackNo"];
+        const char* buff = doc["name"].as<const char*>();
+        strcpy(mp3.track[trackNo].name, buff);
+        mp3.track[trackNo].duration = (int)doc["duration"];
+        mp3.track[trackNo].volume = (int)doc["volume"];
+        mp3.track[trackNo].enableRemote = doc["enableRemote"];
+        mp3.track[trackNo].enableLocal = doc["enableLocal"];
+        writeMP3TrackConfigFile(SPIFFS, trackNo);
+      }
+      else
+      {
+        Serial.println("Deserialisationerror");
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/action/config", HTTP_POST, [](AsyncWebServerRequest *request) {
+      String body = request->arg("plain");
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, body);
+      if (!error)
+      {
+        uint8_t number = (int)doc["number"];
+        const char* buff = doc["name"].as<const char*>();
+        strcpy(action[number].name, buff);
+        action[number].enableRemote = doc["enableRemote"];
+        action[number].enableLocal = doc["enableLocal"];
+        writeActionConfigFile(SPIFFS, number);
+      }
+      else
+      {
+        Serial.println("Deserialisationerror");
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/gpio/value/bit", HTTP_POST, [](AsyncWebServerRequest *request) {
+      String body = request->arg("plain");
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, body);
+      if (!error)
+      {
+        uint8_t bit = (int)doc["bitNo"];
+        gpio[bit].alwaysWrite((int)doc["value"]);
+        Serial.print("GPIO Bit:");
+        Serial.println(bit);
+      }
+      else
+      {
+        Serial.println("Deserialisationerror");
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/mp3Player/config", HTTP_POST, [](AsyncWebServerRequest *request) {
+      String body = request->arg("plain");
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, body);
+      if (!error)
+      {
+        mp3.manualTrim = doc["manualTrim"];
+        mp3.autoTrim = doc["autoTrim"];
+        writeMP3ConfigFile(SPIFFS);
+      }
+      else
+      {
+        Serial.println("Deserialisationerror");
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/action/play", HTTP_POST, [](AsyncWebServerRequest *request) {
+      String body = request->arg("plain");
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, body);
+      if (!error)
+      {
+        int number = (int)doc["number"];
+        bool loop = doc["loop"];
+        if ((number >= 0) && (number < 16))
+        {
+          action[number].play(CMD_ANY, loop);
+        }
+      }
+      else
+      {
+        Serial.println("Deserialisationerror");
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/action/stop", HTTP_POST, [](AsyncWebServerRequest *request) {
+      String body = request->arg("plain");
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, body);
+      if (!error)
+      {
+        int number = (int)doc["number"];
+        if ((number >= 0) && (number < 16))
+        {
+          action[number].stop(CMD_ANY);
+        }
+      }
+      else
+      {
+        Serial.println("Deserialisationerror");
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/soundtrack/play", HTTP_POST, [](AsyncWebServerRequest *request) {
+      String body = request->arg("plain");
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, body);
+      if (!error)
+      {
+        int track = (int)doc["track"];
+        bool loop = doc["loop"];
+        if ((track >= 0) && (track < 16))
+        {
+          mp3.play(CMD_ANY, track, loop);
+        }
+      }
+      else
+      {
+        Serial.println("Deserialisationerror");
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/soundtrack/stop", HTTP_POST, [](AsyncWebServerRequest *request) {
+      String body = request->arg("plain");
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, body);
+      if (!error)
+      {
+        int track = (int)doc["track"];
+        mp3.stop(CMD_ANY);
+        if ((track >= 0) && (track < 16))
+        {
+          mp3.stop(CMD_ANY);
+        }
+      }
+      else
+      {
+        Serial.println("Deserialisationerror");
+      }
+      request->send(200, "application/json", "OK");
+    });
+
     // Handle POST requests
     // ********************
     server.onRequestBody([](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) 
     {
-    //  Serial.println("Received api POST request");
-    //  Serial.println(request->url());
+      Serial.println(request->url());
+
+      if ((request->url() == "/api/object/identify") ||
+          (request->url() == "/api/node/restart") ||
+          (request->url() == "/api/nodeid/value") ||
+          (request->url() == "/api/brokerip/value") ||
+          (request->url() == "/api/gpio/config/bit") ||
+          (request->url() == "/api/soundtrack/config") ||
+          (request->url() == "/api/action/config") ||
+          (request->url() == "/api/gpio/value/bit") ||
+          (request->url() == "/api/mp3Player/config") ||
+          (request->url() == "/api/action/play") ||
+          (request->url() == "/api/action/stop") ||
+          (request->url() == "/api/soundtrack/play") ||
+          (request->url() == "/api/soundtrack/stop"))
+      {
+        return;
+      }
 
       if (request->url() == "/api/node/restart") 
       {
@@ -815,35 +1179,6 @@ void setupWiFi()
           }
       }
 
-
-      if (request->url() == "/api/object/run") 
-      {
-          JsonDocument doc;
-          DeserializationError error = deserializeJson(doc, (const char*)data);
-          if(error)
-          {
-              Serial.println("Deserialisationerror");
-          }
-          else
-          {
-            int index = (int) doc["index"];
-            int path = (int) doc["path"];
-            if (!queueObjectRun(index, path))
-            {
-              Serial.println("Failed to queue object run");
-            }
-          }
-      }
-
-      if (request->url() == "/api/object/identify") 
-      {
-          Serial.println("Received /api/object/identify POST request");
-          // No payload is required for identify; queue the task regardless of body content.
-          if (!queueObjectIdentify())
-          {
-            Serial.println("Failed to queue object identify");
-          }
-      }
 
       //Serial.println("200");
       request->send(200,"application/json","OK");

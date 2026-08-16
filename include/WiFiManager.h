@@ -11,5 +11,6 @@ int WiFiGetRSSI();
 void setupWiFi(); 
 bool initWiFi();                                            
 void checkWiFiConnection();
+bool queueSceneRun(int index);
 
 #endif // WIFIMANAGER_H

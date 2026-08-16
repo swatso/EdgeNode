@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scene Runner</title>
+  <link rel="shortcut icon" href="/favicon" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 24px;
+      background: #f6f8fa;
+      color: #1f2937;
+    }
+    .card {
+      max-width: 420px;
+      padding: 20px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 12px;
+      box-sizing: border-box;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    #status {
+      margin-top: 14px;
+      white-space: pre-wrap;
+      color: #374151;
+    }
+
+    .error {
+      color: #b30000;
+      margin-top: 8px;
+      min-height: 1.5em;
+    }
+  </style>
+  <script src="/common.js"></script>
+</head>
+<body>
+  <div class="card">
+    <h1>Scene Runner</h1>
+    <label for="sceneIndex">Scene index</label>
+    <input id="sceneIndex" type="number" min="1" step="1" value="1">
+    <button id="runButton">Run Scene</button>
+    <div id="status">Waiting for input...</div>
+    <p id="error" class="error"></p>
+  </div>
+
+  <script>
+    const sceneIndexInput = document.getElementById('sceneIndex');
+    const runButton = document.getElementById('runButton');
+    const status = document.getElementById('status');
+
+    runButton.addEventListener('click', async () => {
+      const index = Number.parseInt(sceneIndexInput.value, 10);
+      if (!Number.isInteger(index) || index < 1) {
+        status.textContent = 'Please enter a positive integer scene index.';
+        setPageError('');
+        return;
+      }
+
+      status.textContent = 'Posting scene ' + index + ' request...';
+      try {
+        await postJson('/api/scene/run', { index: index });
+
+        status.textContent = 'Scene ' + index + ' request sent successfully.';
+        setPageError('');
+      } catch (error) {
+        status.textContent = 'Failed to send scene ' + index + ' request.';
+        setPageError('Failed to send scene ' + index + ' request: ' + error);
+      }
+    });
+  </script>
+</body>
+</html>

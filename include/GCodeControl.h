@@ -8,8 +8,14 @@ void initGCodeControl(uint32_t baud = 250000, int8_t rxPin = 22, int8_t txPin = 
 void setSpeedPercent(int speed);
 void MarlinSender(const char* line);
 bool runPath(int obj, int path);
+bool runScene(int scene);
 bool sendGCodeFile(const char* filePath);
 bool sendGCodeFileList(const char* listFilePath);
+// Synchronous variants: block until the transfer completes. Use only from dedicated
+// background tasks (e.g. RFID identify/select logic) that must sequence on completion;
+// prefer the non-blocking sendGCodeFile()/sendGCodeFileList() everywhere else.
+bool sendGCodeFileBlocking(const char* filePath);
+bool sendGCodeFileListBlocking(const char* listFilePath);
 void GCodeObjectRFIDReporter(const char* rfidTag);
 void loadGCodeObject();
 

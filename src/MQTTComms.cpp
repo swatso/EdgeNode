@@ -469,7 +469,11 @@ Serial.println(gcodePayload);
     // This is a GCode Driver Home topic
 
     Serial.println("(MQTTcallback) GCode Driver Home event");
-    sendGCodeFile("/home.gcode");
+    //sendGCodeFile("/home.gcode");
+    if (!queueSceneRun(100))
+    {
+      Serial.println("(MQTTcallback) Failed to queue home scene");
+    }
 
   }
   else if (strncmp(topic, GCodeDriverLockTopic, strlen(GCodeDriverLockTopic)) == 0) 
