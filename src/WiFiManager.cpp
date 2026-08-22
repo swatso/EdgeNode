@@ -214,6 +214,9 @@ bool initWiFi()
   }
   String localHostIP = WiFiGetIPAddress();
   Serial.println(localHostIP);
+  // Disable WiFi modem power-save: under sustained CPU load (e.g. long blocking Marlin/SD scene
+  // waits) the modem can miss its power-save wake window, wedging the TCP send path (errno 11/EAGAIN).
+  WiFi.setSleep(false);
   Serial.println("(initOTA)...");
   ArduinoOTA.setHostname(node.hostName);
   ArduinoOTA
@@ -225,7 +228,7 @@ bool initWiFi()
       else // U_SPIFFS
       {
         type = "filesystem";
-        // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+        // NOTE: if updating SPIFFS this would be the place to unmount it using SPIFFS.end()
         SPIFFS.end();
       }
       Serial.println("Start updating " + type);
@@ -352,35 +355,40 @@ void setupWiFi()
       }
     }
 
-//    Serial.println("initialising web server");
+    Serial.println("initialising web server");
+
+    // Force every HTTP response to close its connection instead of lingering in
+    // keep-alive: ESP32's lwIP has only a handful of TCP PCBs shared with MQTT/OTA/mDNS,
+    // and idle keep-alive browser connections were suspected of starving that pool.
+    DefaultHeaders::Instance().addHeader("Connection", "close");
 
     // Route for /home web page
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-      //Serial.println("Serve node.html");
+      Serial.println("Serve node.html");
       request->send(SPIFFS, "/node.html", "text/html", false);
     });
 
     // Route for /node web page
     server.on("/page/node", HTTP_GET, [](AsyncWebServerRequest *request) {
-      //Serial.println("Serve node.html");
+      Serial.println("Serve node.html");
       request->send(SPIFFS, "/node.html", "text/html", false);
     });
 
     // Route for node configuration web page
     server.on("/page/nodeconfig", HTTP_GET, [](AsyncWebServerRequest *request) {
-      //Serial.println("Serve nodeConfig.html");
+      Serial.println("Serve nodeConfig.html");
       request->send(SPIFFS, "/nodeConfig.html", "text/html", false);
     });
 
     // Route for gpio bit configuration web page
     server.on("/page/gpioconfig", HTTP_GET, [](AsyncWebServerRequest *request) {
-      //Serial.println("Serve gpioConfig.html");
+      Serial.println("Serve gpioConfig.html");
       request->send(SPIFFS, "/gpioConfig.html", "text/html", false);
     });
 
     // Route for gpio web page
     server.on("/page/gpio", HTTP_GET, [](AsyncWebServerRequest *request) {
-      //Serial.println("Serve gpio.html");
+      Serial.println("Serve gpio.html");
       request->send(SPIFFS, "/gpio.html", "text/html", false);
     });
 
@@ -398,22 +406,22 @@ void setupWiFi()
 
     // Route for sound web page
     server.on("/page/sound", HTTP_GET, [](AsyncWebServerRequest *request) {
-      //Serial.println("Serve sound.html");
+      Serial.println("Serve sound.html");
       request->send(SPIFFS, "/sound.html", "text/html", false);
     });
 
     // Route for soundConfig config web page
     server.on("/page/soundconfig", HTTP_GET, [](AsyncWebServerRequest *request) {
-      //Serial.println("Serve soundConfig.html");
+      Serial.println("Serve soundConfig.html");
       request->send(SPIFFS, "/soundConfig.html", "text/html", false);
     });
 
     // Route for Objects web page
     server.on("/page/objects", HTTP_GET, [](AsyncWebServerRequest *request) {
       Serial.println("Serve objects.html");
-      AsyncWebServerResponse *response = request->beginResponse(SPIFFS, "/objects.html", "text/html");
-      response->addHeader("Connection", "close");
-      request->send(response);
+      // Forcing "Connection: close" here previously left a TCP PCB stuck (lwIP has only a few
+      // slots), starving other sockets (e.g. MQTT) and causing repeated write() errno 11 failures.
+      request->send(SPIFFS, "/objects.html", "text/html", false);
     });
 
     // Route for Scene web page
@@ -424,7 +432,7 @@ void setupWiFi()
 
     // Route for /favicon
     server.on("/favicon", HTTP_GET, [](AsyncWebServerRequest *request) {
-      //Serial.println("Serve favicon.png");
+      Serial.println("Serve favicon.png");
       request->send(SPIFFS, "/Favicon.png", "image/png", false);
     });
 
@@ -657,6 +665,24 @@ void setupWiFi()
         serializeJson(doc,*response);  
         request->send(response);
       }
+    });
+
+    server.on("/api/object/status/all", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+      // Returns all object names/indices in a single response, avoiding a burst of
+      // 16 separate requests (observed to exhaust ESP32 TCP resources and stall
+      // the MQTT connection when objects.html loaded).
+      AsyncResponseStream *response = request->beginResponseStream("application/json", 1024);
+      JsonDocument doc;
+      JsonArray objects = doc["objects"].to<JsonArray>();
+      for (int i = 0; i < kObjectCount; i++)
+      {
+        JsonObject obj = objects.add<JsonObject>();
+        obj["index"] = i;
+        obj["name"] = gcodeObjects[i].name;
+      }
+      serializeJson(doc, *response);
+      request->send(response);
     });
 
 

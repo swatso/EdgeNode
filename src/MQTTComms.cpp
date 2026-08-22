@@ -24,6 +24,7 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>                    		
 #include <AsyncTCP.h>                             		
+#include "freertos/semphr.h"
 #include "MQTTComms.h"
 #include "MQTTServices.h"
 #include "NodeServices.h"
@@ -67,6 +68,53 @@ PubSubClient client(espClient);
 TaskHandle_t MQTTSensorService;
 TaskHandle_t MQTTMessageService;
 TaskHandle_t MQTTServiceHandle;
+
+// PubSubClient is not thread-safe, but its methods are called from mqttServiceTask,
+// sensorReceiverTask and messageReceiverTask concurrently - this mutex serialises all
+// access to `client` to prevent internal buffer/socket-state corruption (observed as a
+// persistent errno 11/EAGAIN on the underlying socket once two tasks raced on it).
+static SemaphoreHandle_t mqttClientMutex = nullptr;
+
+static void ensureMqttClientMutex()
+{
+  if (mqttClientMutex == nullptr)
+  {
+    mqttClientMutex = xSemaphoreCreateMutex();
+  }
+}
+
+// Locks only around the single subscribe() call - callers that also call serviceConnection()
+// afterwards rely on that function taking the mutex itself, so this must not span both.
+static void mqttSubscribe(const char* topic)
+{
+  ensureMqttClientMutex();
+  xSemaphoreTake(mqttClientMutex, portMAX_DELAY);
+  client.subscribe(topic);
+  xSemaphoreGive(mqttClientMutex);
+}
+
+// A stuck TCP socket (e.g. write() stuck returning errno 11/EAGAIN after a long blocking call
+// elsewhere starved the WiFi stack) can leave client.connected() reporting true forever, so
+// publish failures are counted here and used to force a disconnect/reconnect cycle.
+constexpr uint8_t kMaxConsecutivePublishFailures = 5;
+static uint8_t consecutivePublishFailures = 0;
+
+static void notePublishResult(boolean success)
+{
+  if (success)
+  {
+    consecutivePublishFailures = 0;
+    return;
+  }
+
+  consecutivePublishFailures++;
+  if (consecutivePublishFailures >= kMaxConsecutivePublishFailures)
+  {
+    Serial.println("(publishMQTT) Too many consecutive publish failures - forcing MQTT disconnect/reconnect");
+    client.disconnect();
+    consecutivePublishFailures = 0;
+  }
+}
 
 namespace {
 constexpr float kPoseMinX = 0.0F;
@@ -231,26 +279,41 @@ void setupMQTTComms()
 boolean connectMQTTClient() 
 {
   // Attempt to reconnect, return true if successful, otherwise false
-  if (!client.connected()) 
+  ensureMqttClientMutex();
+  xSemaphoreTake(mqttClientMutex, portMAX_DELAY);
+  boolean alreadyConnected = client.connected();
+  boolean connected = false;
+  if (!alreadyConnected)
   {
     Serial.println("(connectMQTTClient) Not connected");
     // Build clientID based on the NodeID
     String clientId = node.getNodeIDstring();
     clientId += "-";
     clientId += String(micros() & 0xff, 16); // to randomise. sort of
-    
+
     // Attempt to connect
-    if (client.connect(clientId.c_str())) 
+    connected = client.connect(clientId.c_str());
+    if (connected)
     {
-      Serial.print("Connected to MQTT Broker at: ");
-      Serial.println(node.brokerIP);
       MQTTConnectionTime = millis();
-      subscribeTopics();
-      return(true);     // Connected
     }
-    return(false);    // Not yet connected
-  } 
-  return(true);         // already connected
+  }
+  xSemaphoreGive(mqttClientMutex);
+
+  if (alreadyConnected)
+  {
+    return true;          // already connected
+  }
+
+  if (connected)
+  {
+    Serial.print("Connected to MQTT Broker at: ");
+    Serial.println(node.brokerIP);
+    subscribeTopics();
+    return true;          // Connected
+  }
+
+  return false;           // Not yet connected
 }
 
 
@@ -267,7 +330,7 @@ boolean  subscribeTopics()
     if(turnoutTopic[17] > 57)turnoutTopic[17]+=7;
 
     subscription.assign(turnoutTopic,18);
-    client.subscribe(subscription.c_str());
+    mqttSubscribe(subscription.c_str());
     serviceConnection();
     yield();
   }
@@ -280,13 +343,13 @@ boolean  subscribeTopics()
     if(soundControlTopic[15] > 57)soundControlTopic[15]+=7;
 
     subscription.assign(soundControlTopic,18);
-    client.subscribe(subscription.c_str());
+    mqttSubscribe(subscription.c_str());
     serviceConnection();
     yield();
   }
 
   // subscribe to the action topic for direct action control
-  client.subscribe(soundAutoTrimTopic);
+  mqttSubscribe(soundAutoTrimTopic);
 
   for(i=0; i<17; i++)
   {
@@ -295,30 +358,34 @@ boolean  subscribeTopics()
     if(actionTopic[16] > 57)actionTopic[16]+=7;
     Serial.print("Subscribing to:");
     Serial.println(actionTopic);
-    client.subscribe(actionTopic);
+    mqttSubscribe(actionTopic);
     serviceConnection();
     yield();
   }
 
   // subscribe to the RFID reporter topic for identifying GCode objects as they pass the RFID reader
-  client.subscribe(RFIDReporterTopic);
-  client.subscribe(GCodeDriverG1Topic);
-  client.subscribe(GCodeDriverSpeedTopic);
-  client.subscribe(GCodeDriverHomeTopic);
-  client.subscribe(GCodeDriverLockTopic);
-  client.subscribe(GCodeDriverUnlockTopic);
+  mqttSubscribe(RFIDReporterTopic);
+  mqttSubscribe(GCodeDriverG1Topic);
+  mqttSubscribe(GCodeDriverSpeedTopic);
+  mqttSubscribe(GCodeDriverHomeTopic);
+  mqttSubscribe(GCodeDriverLockTopic);
+  mqttSubscribe(GCodeDriverUnlockTopic);
   return(true);
 }
 
 
 boolean publishMQTT(char* topic, char* message)
 {
+   ensureMqttClientMutex();
+   xSemaphoreTake(mqttClientMutex, portMAX_DELAY);
+   boolean success = false;
    if (client.connected())
    {
-      client.publish(topic , message);
-      return(true);
+      success = client.publish(topic , message);
+      notePublishResult(success);
    }
-   return(false);
+   xSemaphoreGive(mqttClientMutex);
+   return(success);
 }
 
 boolean publishReporterLine(const char* message)
@@ -328,23 +395,32 @@ boolean publishReporterLine(const char* message)
     return false;
   }
 
-  if (!client.connected())
+  ensureMqttClientMutex();
+  xSemaphoreTake(mqttClientMutex, portMAX_DELAY);
+  boolean success = false;
+  if (client.connected())
   {
-    return false;
+    success = client.publish(reporterTopic, message);
+    notePublishResult(success);
   }
-
-  return client.publish(reporterTopic, message);
+  xSemaphoreGive(mqttClientMutex);
+  return success;
 }
 
 
 void serviceConnection()
 {
   // Service the MQTT client
-  if (client.connected()) 
+  ensureMqttClientMutex();
+  xSemaphoreTake(mqttClientMutex, portMAX_DELAY);
+  boolean isConnected = client.connected();
+  if (isConnected)
   {
     client.loop();
   }
-  else 
+  xSemaphoreGive(mqttClientMutex);
+
+  if (!isConnected)
   {
     Serial.println("(serviceConnection) MQTT not connected - attempting reconnect");
     connectMQTTClient();
@@ -576,7 +652,11 @@ void messageReceiverTask(void *pvParameters)
 boolean checkMQTTState()
 {
   // returns the MQTT client connection state
-  return(client.connected());
+  ensureMqttClientMutex();
+  xSemaphoreTake(mqttClientMutex, portMAX_DELAY);
+  boolean isConnected = client.connected();
+  xSemaphoreGive(mqttClientMutex);
+  return isConnected;
 }
 
 unsigned long getMQTTUptime()

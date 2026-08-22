@@ -81,20 +81,15 @@
       }
 
       async function loadAllObjects() {
-        for (let i = 0; i < OBJECT_COUNT; i++) {
-          await getObjectStatus(i);
-        }
-      }
-
-      async function getObjectStatus(index) {
         try {
-          document.getElementById(`name${index}`).innerText = "Loading...";
-          const resp = await getJson(`/api/object/status/index?index=${index}`);
-          document.getElementById(`index${index}`).innerText = index === selectedObject ? `${index}*` : `${index}`;
-          document.getElementById(`name${index}`).innerText = resp.name;
+          const resp = await getJson("/api/object/status/all");
+          for (const obj of resp.objects) {
+            document.getElementById(`index${obj.index}`).innerText = obj.index === selectedObject ? `${obj.index}*` : `${obj.index}`;
+            document.getElementById(`name${obj.index}`).innerText = obj.name;
+          }
           setPageError("");
         } catch (error) {
-          setPageError(`Failed to load object ${index}: ${error}`);
+          setPageError(`Failed to load objects: ${error}`);
         }
       }
 

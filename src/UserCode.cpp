@@ -233,16 +233,7 @@ int templateStopFcn(uint8_t number)
 
 int action1PlayFcn(uint8_t number)
 {
-  (void)number;
-  const char* gcodeFilePath = "/home.gcode";
-
-  if (!sendGCodeFile(gcodeFilePath))
-  {
-    localDebug.println("Action 1 failed to send G-code file: " + String(gcodeFilePath));
-    return(0);
-  }
-
-  localDebug.println("Action 1 sent G-code file: " + String(gcodeFilePath));
+  Serial.println("action1PlayFcn: " + String(number));
   return(0);
 }
 
@@ -254,16 +245,6 @@ int action1StopFcn(uint8_t number)
 
 int action2PlayFcn(uint8_t number)
 {
-  (void)number;
-  const char* gcodeFilePath = "/Path14.0.gcode";
-
-  if (!sendGCodeFile(gcodeFilePath))
-  {
-    localDebug.println("Action 2 failed to send G-code file: " + String(gcodeFilePath));
-    return(0);
-  }
-
-  localDebug.println("Action 2 sent G-code file: " + String(gcodeFilePath));
   return(0);
 }
 
@@ -275,16 +256,6 @@ int action2StopFcn(uint8_t number)
 
 int action3PlayFcn(uint8_t number)
 {
-  (void)number;
-  const char* gcodeFilePath = "/Path14.1.gcode";
-
-  if (!sendGCodeFile(gcodeFilePath))
-  {
-    localDebug.println("Action 3 failed to send G-code file: " + String(gcodeFilePath));
-    return(0);
-  }
-
-  localDebug.println("Action 3 sent G-code file: " + String(gcodeFilePath));
   return(0);
 }
 
@@ -296,16 +267,6 @@ int action3StopFcn(uint8_t number)
 
 int action4PlayFcn(uint8_t number)
 {
-  (void)number;
-  const char* gcodeFilePath = "/Path15.0.gcode";
-
-  if (!sendGCodeFile(gcodeFilePath))
-  {
-    localDebug.println("Action 4 failed to send G-code file: " + String(gcodeFilePath));
-    return(0);
-  }
-
-  localDebug.println("Action 4 sent G-code file: " + String(gcodeFilePath));
   return(0);
 }
 
@@ -317,16 +278,6 @@ int action4StopFcn(uint8_t number)
 
 int action5PlayFcn(uint8_t number)
 {
-  (void)number;
-  const char* gcodeFilePath = "/Path15.1.gcode";
-
-  if (!sendGCodeFile(gcodeFilePath)) // send in reverse
-  {
-    localDebug.println("Action 5 failed to send G-code file: " + String(gcodeFilePath));
-    return(0);
-  }
-
-  localDebug.println("Action 5 sent G-code file: " + String(gcodeFilePath));
   return(0);
 }
 
@@ -340,8 +291,6 @@ int action5StopFcn(uint8_t number)
 
 int action6PlayFcn(uint8_t number)
 {
-  loadGCodeObject();
-  localDebug.println("Action 6 load GCode Object");
   return(0);
 }
 
@@ -353,17 +302,6 @@ int action6StopFcn(uint8_t number)
 
 int action7PlayFcn(uint8_t number)
 {
-  (void)number;
-  const char* filePath = "/scene1.txt";
-
-  if (! sendGCodeFileList(filePath))
-  {
-    localDebug.println("Action 7 failed to send list: " + String(filePath));
-    return(0);
-  }
-  
-  localDebug.println("Action 7 sent list: " + String(filePath));
-  return(0);
 }
 
 int action7StopFcn(uint8_t number)
@@ -374,16 +312,6 @@ int action7StopFcn(uint8_t number)
 
 int action8PlayFcn(uint8_t number)
 {
-  (void)number;
-  const char* gcodeFilePath = "/SDPath.gcode";
-
-  if (!sendGCodeFile(gcodeFilePath))
-  {
-    localDebug.println("Action 8 failed to send G-code file: " + String(gcodeFilePath));
-    return(0);
-  }
-
-  localDebug.println("Action 8 sent G-code file: " + String(gcodeFilePath));
   return(0);
 }
 

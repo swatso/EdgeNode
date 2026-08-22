@@ -27,13 +27,10 @@ void setup()
   setupMQTTComms();
   setupUserCode();
   mp3.loadConfig();
-  setupAction();
-  loadActionConfig();
+  //setupAction();
+  //loadActionConfig();
   setupGPIO();
   loadServoPositions();
-  //setupWiFi();
-  //setupMQTTServices();
-  //setupMQTTComms();
   setupSound();
   powerGPIO(true);
 
@@ -46,8 +43,8 @@ Serial.println(xPortGetCoreID());
 void loop()
 {
   pause(5000);
-//getSystemInfo();
-pause(60000);
+//  getSystemInfo();
+//pause(60000);
 }
 
 long exitTime;

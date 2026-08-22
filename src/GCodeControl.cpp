@@ -4,6 +4,7 @@
 #include "marlin_handshake.h"
 #include "MQTTServices.h"
 #include "MQTTComms.h"
+#include "WiFiManager.h"
 
 #include <SPIFFS.h>
 #include <cctype>
@@ -609,7 +610,13 @@ void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
   gcodeObjects[15].setRFIDTag("00EEEC76");
 
   setSpeedPercent(100); // Ensure the speed percentage is applied before homing
-  runScene(100); // Run the homing path to ensure the machine is in a known state
+  // Run homing asynchronously via sceneRunTask so setup() (and MQTT/WiFi/webserver bring-up) isn't
+  // blocked for the ~15-20s the SD homing scene can take - blocking here previously left the WiFi/
+  // MQTT stack starved for CPU time long enough to leave the broker socket in a stuck EAGAIN state.
+  if (!queueSceneRun(100))
+  {
+    Serial.println("[initGCodeControl] ERROR: failed to queue boot-time homing scene (100)");
+  }
 }
 
 void setSpeed(int speed)

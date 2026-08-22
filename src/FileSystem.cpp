@@ -17,13 +17,14 @@ const char* servoConfigPath = "/servoConfig#.txt";
 SemaphoreHandle_t fsLock;
 
 // Initialize SPIFFS
-void setupSPIFFS() 
+void setupSPIFFS()
 {
-  if (!SPIFFS.begin(true)) 
+  if (!SPIFFS.begin(true))
   {
     Serial.println("An error has occurred while mounting SPIFFS");
   }
   Serial.println("SPIFFS mounted successfully");
+  Serial.printf("SPIFFS totalBytes=%u usedBytes=%u\n", SPIFFS.totalBytes(), SPIFFS.usedBytes());
   fsLock = xSemaphoreCreateMutex();
 }
 
