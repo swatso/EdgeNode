@@ -697,13 +697,11 @@ void setupWiFi()
         request->send(400, "application/json", "{\"error\":\"invalid object run payload\"}");
         return;
       }
-
       const int index = object["index"].as<int>();
-      const int path = object["path"].as<int>();
-      if (!queueObjectRun(index, path))
-      {
-        Serial.println("Failed to queue object run");
-      }
+      //const int path = object["path"].as<int>();
+      char ObjectFile[32];
+      snprintf(ObjectFile, sizeof(ObjectFile), "Objects/SoD_%d.GCO", index);
+      runSDPath(ObjectFile);
       request->send(200, "application/json", "OK");
     });
 
@@ -728,10 +726,9 @@ void setupWiFi()
       }
 
       const int index = object["index"].as<int>();
-      if (!queueSceneRunRequest(index))
-      {
-        Serial.println("Failed to queue scene run");
-      }
+      char SceneFile[32];
+      snprintf(SceneFile, sizeof(SceneFile), "Scenes/S_%d.GCO", index);
+      runSDPath(SceneFile);
       request->send(200, "application/json", "OK");
     });
 

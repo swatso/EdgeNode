@@ -37,6 +37,19 @@ void setup()
 Serial.print("Core:");
 Serial.println(xPortGetCoreID());
 
+  // TEMPORARY DIAGNOSTIC: sends a fixed sequence of simple G-code commands and logs raw
+  // send/ack timing, to help isolate Marlin handshake lockups seen at power-up. Remove
+  // (or comment out) once the lockup is diagnosed/fixed.
+ // runMarlinHandshakeSelfTest();
+
+ //Serial.println("Starting SD Path");
+ //runSDPath("OBJ_8/PATH_0.GCO"); // test path to run on startup, for testing only
+ //Serial.println("Completed SD Path");
+
+ //Serial.println("Starting SD Path Blocking");
+ //runSDPathBlocking("OBJ_8/PATH_0.GCO"); // test path to run on startup, for testing only
+ //Serial.println("Completed SD Path Blocking");
+
 //debug.println("Completed Setup");
 }
 
@@ -70,4 +83,6 @@ void setupMQTTPaths()
   globalOperations.setNodeID(node.getNodeID());
   globalDebug.appendNodeID(true);
   globalOperations.appendNodeID(true);
+
+  //runSDPath("OBJ_8/PATH_0.GCO"); // test path to run on startup, for testing only
 }

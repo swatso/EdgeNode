@@ -13,8 +13,8 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 
-//#define MarlinDebug
-#define PrintMarlinLines
+#define MarlinDebug
+//#define PrintMarlinLines
 
 Pose currentPose = {0.0F, 0.0F, 90.0F};
 
@@ -32,8 +32,8 @@ constexpr float kPoseMinX = 0.0F;
 constexpr float kPoseMaxX = 265.0F;
 constexpr float kPoseMinY = 0.0F;
 constexpr float kPoseMaxY = 225.0F;
-//constexpr uint32_t kMarlinAckTimeoutMs = 6000;
-constexpr uint32_t kMarlinAckTimeoutMs = 600000;
+constexpr uint32_t kMarlinAckTimeoutMs = 6000;
+//constexpr uint32_t kMarlinAckTimeoutMs = 600000;
 constexpr uint32_t kMarlinExecutionWaitTimeoutMs = 30000;
 constexpr uint32_t kMarlinSDPrintTimeoutMs = 300000; // SD-hosted paths can run far longer than in-line commands
 constexpr TickType_t kMarlinWaitSliceTicks = pdMS_TO_TICKS(20);
@@ -60,6 +60,14 @@ struct GCodeFileRequest
 };
 QueueHandle_t gcodeFileRequestQueue = nullptr;
 TaskHandle_t gcodeFileTaskHandle = nullptr;
+
+// path is expected to already be fully formed (e.g. "OBJ_1/PATH_0.GCO") by the caller.
+struct SDPathRequest
+{
+  char path[64];
+};
+QueueHandle_t sdPathRequestQueue = nullptr;
+TaskHandle_t sdPathTaskHandle = nullptr;
 
 bool waitForMarlinCommandCompletion(const char* context, uint32_t timeoutMs = kMarlinExecutionWaitTimeoutMs)
 {
@@ -521,6 +529,25 @@ void gcodeFileTask(void* pvParameters)
     }
   }
 }
+
+// Runs runSDPathBlocking() requests off the caller's thread, one at a time, mirroring
+// gcodeFileTask()'s pattern so callers (e.g. MQTT callbacks) never block on the SD print.
+void sdPathTask(void* pvParameters)
+{
+  (void)pvParameters;
+  SDPathRequest request;
+
+  for (;;)
+  {
+    if (xQueueReceive(sdPathRequestQueue, &request, portMAX_DELAY) == pdPASS)
+    {
+      if (!runSDPathBlocking(request.path))
+      {
+        Serial.printf("[sdPathTask] ERROR: failed to run SD path '%s'\n", request.path);
+      }
+    }
+  }
+}
 }
 
 GCodeObject gcodeObjects[kObjectCount];
@@ -576,6 +603,20 @@ void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
     xTaskCreatePinnedToCore(gcodeFileTask, "GCode File", 4096, nullptr, 1, &gcodeFileTaskHandle, 1);
   }
 
+  if (sdPathRequestQueue == nullptr)
+  {
+    sdPathRequestQueue = xQueueCreate(8, sizeof(SDPathRequest));
+    if (sdPathRequestQueue == nullptr)
+    {
+      Serial.println("[initGCodeControl] ERROR: failed to create sdPathRequestQueue");
+    }
+  }
+
+  if ((sdPathTaskHandle == nullptr) && (sdPathRequestQueue != nullptr))
+  {
+    xTaskCreatePinnedToCore(sdPathTask, "SD Path", 4096, nullptr, 1, &sdPathTaskHandle, 1);
+  }
+
   gcodeObjects[0].setName("Tarmac Layer");
   gcodeObjects[0].setRFIDTag("C6CB4A92");
   gcodeObjects[1].setName("JCB 3CX");
@@ -609,14 +650,17 @@ void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
   gcodeObjects[15].setName("ShedB-door");
   gcodeObjects[15].setRFIDTag("00EEEC76");
 
+  //MarlinSender("G28");  //debug
+
   setSpeedPercent(100); // Ensure the speed percentage is applied before homing
+  runSDPath("System/HomePuck.GCO");
   // Run homing asynchronously via sceneRunTask so setup() (and MQTT/WiFi/webserver bring-up) isn't
   // blocked for the ~15-20s the SD homing scene can take - blocking here previously left the WiFi/
-  // MQTT stack starved for CPU time long enough to leave the broker socket in a stuck EAGAIN state.
-  if (!queueSceneRun(100))
+  // MQTT stack starved for CPU time long enough to leave the broker socket in a stuck EAGAIN state. 
+ /* if (!queueSceneRun(100))
   {
     Serial.println("[initGCodeControl] ERROR: failed to queue boot-time homing scene (100)");
-  }
+  } */
 }
 
 void setSpeed(int speed)
@@ -745,6 +789,177 @@ void MarlinSender(const char* line) {
   Serial.println("[MarlinSender] done");
 #endif
   xSemaphoreGive(marlinSendMutex);
+}
+
+// Diagnostic self-test: sends a short, fixed sequence of simple, side-effect-free G-code
+// commands directly via handshake.sendLine()/processInput(), bypassing MarlinSender's
+// pose-parsing/MQTT-publish logic entirely, so a serial capture around this call shows
+// only raw handshake behaviour (send time, ack time, lines received in between). Intended
+// to be called once, e.g. at the very end of setup() after WiFi/MQTT/all tasks are already
+// running, so the CPU/task load at the time of the test matches real power-up conditions
+// where lockups have been observed. Look for "[MarlinSelfTest]" and "[MarlinRX]" lines
+// (enable #define PrintMarlinLines above to also see raw RX trace) in the captured log.
+void runMarlinHandshakeSelfTest()
+{
+  struct TestCommand
+  {
+    const char* line;
+    uint32_t postAckDelayMs; // extra delay after this command acks before sending the next one
+  };
+
+  // Mix of commands that always reply instantly with no motion (M115/M400/M114/M105/M119),
+  // one trivial real motion command that still goes through the planner (G4 P0), and a tight
+  // burst of the same command sent back-to-back with no delay - this helps distinguish
+  // "a specific command triggers it" from "rapid/overlapping sends trigger it".
+  static const TestCommand kTestSequence[] = {
+      {"M115", 250},  // firmware info - exercises a basic single-line reply
+      {"M400", 250},  // finish planner moves - should ack ~instantly, nothing queued
+      {"M114", 250},  // report position - exercises the existing pose-line handler path
+      {"M105", 250},  // report temperature - harmless even with no thermistors configured
+      {"M119", 250},  // report endstop states - read-only
+      {"G4 P0", 250}, // zero-length dwell - a real motion/planner command, not just a query
+      {"M115", 0},    // burst: no delay before next send
+      {"M115", 0},    // burst: no delay before next send
+      {"M115", 500},  // burst: last one gets a settle delay
+  };
+
+  if (marlinSendMutex == nullptr)
+  {
+    Serial.println("[MarlinSelfTest] ERROR: marlinSendMutex not initialised, skipping self-test");
+    return;
+  }
+
+  Serial.println("[MarlinSelfTest] ==== starting Marlin handshake self-test ====");
+
+  for (size_t i = 0; i < (sizeof(kTestSequence) / sizeof(kTestSequence[0])); ++i)
+  {
+    const TestCommand& cmd = kTestSequence[i];
+
+    if (xSemaphoreTake(marlinSendMutex, pdMS_TO_TICKS(10000)) != pdTRUE)
+    {
+      Serial.printf("[MarlinSelfTest] #%u ERROR: timeout acquiring marlinSendMutex before sending '%s'\n",
+                    static_cast<unsigned>(i), cmd.line);
+      continue;
+    }
+
+    const uint32_t sendMs = millis();
+    const uint32_t rxCountAtSend = marlinRxLineCount;
+    Serial.printf("[MarlinSelfTest] #%u >>> sendLine('%s') inFlight=%u atMs=%lu\n",
+                  static_cast<unsigned>(i), cmd.line,
+                  static_cast<unsigned>(handshake.commandsInFlight()),
+                  static_cast<unsigned long>(sendMs));
+
+    handshake.sendLine(cmd.line);
+
+    uint32_t lastHeartbeatMs = sendMs;
+    while (!handshake.canSendNow())
+    {
+      handshake.processInput();
+
+      const uint32_t nowMs = millis();
+      if ((nowMs - lastHeartbeatMs) >= 250)
+      {
+        Serial.printf("[MarlinSelfTest] #%u ... waiting elapsed=%lu ms inFlight=%u rxLinesSinceSend=%u lastRxMs=%lu\n",
+                      static_cast<unsigned>(i),
+                      static_cast<unsigned long>(nowMs - sendMs),
+                      static_cast<unsigned>(handshake.commandsInFlight()),
+                      static_cast<unsigned>(marlinRxLineCount - rxCountAtSend),
+                      static_cast<unsigned long>(lastMarlinRxMs));
+        lastHeartbeatMs = nowMs;
+      }
+
+      if (handshake.isAckStalled(kMarlinAckTimeoutMs, nowMs))
+      {
+        Serial.printf("[MarlinSelfTest] #%u LOCKUP DETECTED: no ack for '%s' after %lu ms (rxLinesSinceSend=%u) - resetting handshake\n",
+                      static_cast<unsigned>(i), cmd.line,
+                      static_cast<unsigned long>(nowMs - sendMs),
+                      static_cast<unsigned>(marlinRxLineCount - rxCountAtSend));
+        handshake.reset();
+        break;
+      }
+
+      vTaskDelay(kMarlinWaitSliceTicks);
+    }
+
+    const uint32_t ackMs = millis();
+    Serial.printf("[MarlinSelfTest] #%u <<< ack (or reset) for '%s' after %lu ms\n",
+                  static_cast<unsigned>(i), cmd.line,
+                  static_cast<unsigned long>(ackMs - sendMs));
+
+    xSemaphoreGive(marlinSendMutex);
+
+    if (cmd.postAckDelayMs > 0)
+    {
+      vTaskDelay(pdMS_TO_TICKS(cmd.postAckDelayMs));
+    }
+  }
+
+  Serial.println("[MarlinSelfTest] ==== self-test complete ====");
+}
+
+// Blocking implementation for runSDPath(): path must already be a complete, Marlin-ready
+// SD path (e.g. "OBJ_1/PATH_0.GCO"); this function performs no formatting of its own.
+bool runSDPathBlocking(const char* path)
+{
+  if ((path == nullptr) || (path[0] == '\0'))
+  {
+    Serial.println("[runSDPathBlocking] ERROR: empty path");
+    return false;
+  }
+
+  char selectPathLine[80];
+  snprintf(selectPathLine, sizeof(selectPathLine), "M23 %s", path);
+
+  MarlinSender("M21");
+  MarlinSender(selectPathLine);
+  const uint32_t sdPrintBaseline = sdPrintCompletionCount;
+  const uint32_t sdFailureBaseline = sdPrintFailureCount;
+  MarlinSender("M24");
+
+  if (!waitForSDPrintDone("runSDPathBlocking", sdPrintBaseline, sdFailureBaseline))
+  {
+    Serial.printf("[runSDPathBlocking] ERROR: timed out waiting for SD print completion path='%s'\n", path);
+    return false;
+  }
+
+  MarlinSender("M400");
+  if (!waitForMarlinCommandCompletion("runSDPathBlocking/M400"))
+  {
+    Serial.printf("[runSDPathBlocking] ERROR: timed out waiting for path completion path='%s'\n", path);
+    return false;
+  }
+  Serial.printf("[runSDPathBlocking] completed path='%s'\n", path);
+  MarlinSender("M114");
+  return true;
+}
+
+// Queues a preformed SD path (e.g. "OBJ_1/PATH_0.GCO") to be run by the background sdPathTask;
+// returns whether the request was accepted (queued), not whether the print has completed. Safe
+// to call from any context, including MQTT callbacks, since it never blocks on the SD transfer.
+bool runSDPath(const char* path)
+{
+  if ((path == nullptr) || (path[0] == '\0'))
+  {
+    Serial.println("[runSDPath] ERROR: empty path");
+    return false;
+  }
+
+  if (sdPathRequestQueue == nullptr)
+  {
+    Serial.println("[runSDPath] ERROR: sdPathRequestQueue not initialised");
+    return false;
+  }
+
+  SDPathRequest request;
+  strncpy(request.path, path, sizeof(request.path) - 1);
+  request.path[sizeof(request.path) - 1] = '\0';
+
+  if (xQueueSend(sdPathRequestQueue, &request, 0) != pdPASS)
+  {
+    Serial.printf("[runSDPath] WARNING: queue full, dropped request for '%s'\n", path);
+    return false;
+  }
+  return true;
 }
 
 bool runPath(int obj, int path)
@@ -1260,9 +1475,9 @@ void loadGCodeObject()
 {
   // This function is invoked by the user (typically via an MQTT event or by pressing a pushbutton)
   // It performs the following actions:
-  //   1. Streams pathRFID1 to home the puck and move the object past the RFID reader.
-  //   2. If the RFID reader detected the object, streams pathRFID3 to home the puck.
-  //      Otherwise, streams pathRFID2 to move the object closer to the RFID reader.
+  //   1. Streams path RFID0 to home the puck and move the object past the RFID reader.
+  //   2. If the RFID reader detected the object, streams path RFID2 to home the puck.
+  //      Otherwise, streams path RFID1 to move the object closer to the RFID reader.
   //   3. If an object was detected:
   //        - Resets its pose to the known loaded position (0, 0, heading 90).
   //        - Sends the start-of-day G-code file to move it to its starting position.
@@ -1270,18 +1485,15 @@ void loadGCodeObject()
   RFIDObjectIndex = -1;
   RFIDEnable = true;    // enable the RFID reader to detect the object
 
-  //sendGCodeFileBlocking("/pathRFID1.gcode");
-  runScene(101); // Run the path to move the object past the RFID reader
+  runSDPathBlocking("System/RFID_0.GCO");
   if (RFIDObjectIndex != -1)
   {
-    //sendGCodeFileBlocking("/pathRFID3.gcode"); // Tag detected — home the puck
-    runScene(103); // Run the path to home the puck
+    runSDPathBlocking("System/RFID_1.GCO"); // Move the object past the RFID reader
     localDebug.println("Object detected after first move, sent path to home the puck");
   }
   else
   {
-    //sendGCodeFileBlocking("/pathRFID2.gcode");
-    runScene(102); // Run the path to move the object closer to the RFID reader
+    runSDPathBlocking("System/RFID_2.GCO"); // Run the path to move the object closer to the RFID reader
     localDebug.println("No object detected after first move, sent alternate path to move closer to RFID reader");
   }
 
@@ -1295,9 +1507,8 @@ void loadGCodeObject()
     localDebug.println("Loaded GCode object: " + String(gcodeObjects[RFIDObjectIndex].name));
 
     char startOfDayFile[32];
-    snprintf(startOfDayFile, sizeof(startOfDayFile), "/Path%d.0.gcode", RFIDObjectIndex);
-    //sendGCodeFileBlocking(startOfDayFile);
-    runPath(RFIDObjectIndex, 0); // Move the object to its starting position
+    snprintf(startOfDayFile, sizeof(startOfDayFile), "Objects/SoD_%d.GCO", RFIDObjectIndex);
+    runSDPathBlocking(startOfDayFile);
   }
   else
   {
@@ -1311,8 +1522,8 @@ void loadGCodeObject(int index)
   // select object and move it to its starting position.
   localDebug.println("Loaded GCode object: " + String(gcodeObjects[index].name));
   char startOfDayFile[32];
-  snprintf(startOfDayFile, sizeof(startOfDayFile), "/Path%d.0.gcode", index);
-  sendGCodeFileBlocking(startOfDayFile);
+  snprintf(startOfDayFile, sizeof(startOfDayFile), "Objects/SoD_%d.GCO", index);
+  runSDPath(startOfDayFile);
 }
 
 

@@ -7,8 +7,19 @@
 void initGCodeControl(uint32_t baud = 250000, int8_t rxPin = 22, int8_t txPin = 23);
 void setSpeedPercent(int speed);
 void MarlinSender(const char* line);
+// Diagnostic: sends a fixed sequence of simple G-code commands directly via the handshake's
+// sendLine()/processInput(), logging raw send/ack timing to Serial, to help isolate handshake
+// lockups independent of any specific higher-level function. Safe to call once, e.g. at the
+// end of setup(), after initGCodeControl() has run.
+void runMarlinHandshakeSelfTest();
 bool runPath(int obj, int path);
 bool runScene(int scene);
+// New SD-path workflow: path must already be a complete, Marlin-ready SD path
+// (e.g. "OBJ_1/PATH_0.GCO"). runSDPath() queues the request on a background task
+// (non-blocking, safe from MQTT callbacks); runSDPathBlocking() is the synchronous
+// implementation, exposed for callers that must block on completion.
+bool runSDPath(const char* path);
+bool runSDPathBlocking(const char* path);
 bool sendGCodeFile(const char* filePath);
 bool sendGCodeFileList(const char* listFilePath);
 // Synchronous variants: block until the transfer completes. Use only from dedicated
