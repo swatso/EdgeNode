@@ -430,6 +430,12 @@ void setupWiFi()
       request->send(SPIFFS, "/scene.html", "text/html", false);
     });
 
+    // Route for Scenes web page
+    server.on("/page/scenes", HTTP_GET, [](AsyncWebServerRequest *request) {
+      Serial.println("Serve scenes.html");
+      request->send(SPIFFS, "/scenes.html", "text/html", false);
+    });
+
     // Route for /favicon
     server.on("/favicon", HTTP_GET, [](AsyncWebServerRequest *request) {
       Serial.println("Serve favicon.png");
@@ -686,6 +692,22 @@ void setupWiFi()
     });
 
 
+    server.on("/api/scene/status/all", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+      // Returns all scene names/indices in a single response, mirroring /api/object/status/all.
+      AsyncResponseStream *response = request->beginResponseStream("application/json", 1024);
+      JsonDocument doc;
+      JsonArray sceneArray = doc["scenes"].to<JsonArray>();
+      for (int i = 0; i < kSceneCount; i++)
+      {
+        JsonObject obj = sceneArray.add<JsonObject>();
+        obj["index"] = i;
+        obj["name"] = scenes[i].name;
+      }
+      serializeJson(doc, *response);
+      request->send(response);
+    });
+
     server.on("/api/object/run", HTTP_POST, [](AsyncWebServerRequest *request, JsonVariant &json) {
       JsonObjectConst object = json.as<JsonObjectConst>();
       const bool hasIndex = object.containsKey("index");
@@ -726,9 +748,13 @@ void setupWiFi()
       }
 
       const int index = object["index"].as<int>();
-      char SceneFile[32];
-      snprintf(SceneFile, sizeof(SceneFile), "Scenes/S_%d.GCO", index);
-      runSDPath(SceneFile);
+      if ((index < 0) || (index >= kSceneCount))
+      {
+        request->send(400, "application/json", "{\"error\":\"invalid scene index\"}");
+        return;
+      }
+
+      scenes[index].run();
       request->send(200, "application/json", "OK");
     });
 
@@ -772,31 +798,41 @@ void setupWiFi()
       request->send(200, "application/json", "OK");
     });
 
-    server.on("/api/gpio/config/bit", HTTP_POST, [](AsyncWebServerRequest *request) {
-      String body = request->arg("plain");
-      JsonDocument doc;
-      DeserializationError error = deserializeJson(doc, body);
-      if (!error)
+    server.on("/api/gpio/config/bit", HTTP_POST, [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObjectConst object = json.as<JsonObjectConst>();
+      if (!object.containsKey("bitNo") || !object.containsKey("type"))
       {
-        uint8_t bit = (int)doc["bitNo"];
-        const char* buff = doc["name"].as<const char*>();
-        strcpy(gpio[bit].name, buff);
-        gpio[bit].alwaysWrite((int)doc["value"]);
-        gpio[bit].setType((int)doc["type"]);
-        gpio[bit].preset0 = (int)doc["preset0"];
-        gpio[bit].preset1 = (int)doc["preset1"];
-        gpio[bit].preset2 = (int)doc["preset2"];
-        gpio[bit].rate = (int)doc["rate"];
-        gpio[bit].enableRemote = doc["enableRemote"];
-        gpio[bit].enableLocal = doc["enableLocal"];
-        gpio[bit].setPublishRate((int)doc["publishRate"]);
-        gpio[bit].setEasingType((int)doc["easingType"]);
-        writeConfigFile(SPIFFS, bit);
+        Serial.println("/api/gpio/config/bit - invalid payload");
+        request->send(400, "application/json", "{\"error\":\"invalid GPIO config payload\"}");
+        return;
       }
-      else
+
+      const int bit = object["bitNo"].as<int>();
+      if ((bit < 0) || (bit >= kGpioCount))
       {
-        Serial.println("Deserialisationerror");
+        request->send(400, "application/json", "{\"error\":\"invalid bitNo\"}");
+        return;
       }
+
+      const char* name = object["name"].as<const char*>();
+      if (name != nullptr)
+      {
+        strcpy(gpio[bit].name, name);
+      }
+      gpio[bit].setType(object["type"].as<int>());
+      if (object.containsKey("value"))
+      {
+        gpio[bit].alwaysWrite(object["value"].as<int>());
+      }
+      gpio[bit].preset0 = object["preset0"].as<int>();
+      gpio[bit].preset1 = object["preset1"].as<int>();
+      gpio[bit].preset2 = object["preset2"].as<int>();
+      gpio[bit].rate = object["rate"].as<int>();
+      gpio[bit].enableRemote = object["enableRemote"].as<bool>();
+      gpio[bit].enableLocal = object["enableLocal"].as<bool>();
+      gpio[bit].setPublishRate(object["publishRate"].as<int>());
+      gpio[bit].setEasingType(object["easingType"].as<int>());
+      writeConfigFile(SPIFFS, bit);
       request->send(200, "application/json", "OK");
     });
 
@@ -817,7 +853,7 @@ void setupWiFi()
       }
       else
       {
-        Serial.println("Deserialisationerror");
+        Serial.println("/api/soundtrack/config - Deserialisationerror");
       }
       request->send(200, "application/json", "OK");
     });
@@ -837,26 +873,30 @@ void setupWiFi()
       }
       else
       {
-        Serial.println("Deserialisationerror");
+        Serial.println("/api/action/config - Deserialisationerror");
       }
       request->send(200, "application/json", "OK");
     });
 
-    server.on("/api/gpio/value/bit", HTTP_POST, [](AsyncWebServerRequest *request) {
-      String body = request->arg("plain");
-      JsonDocument doc;
-      DeserializationError error = deserializeJson(doc, body);
-      if (!error)
+    server.on("/api/gpio/value/bit", HTTP_POST, [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObjectConst object = json.as<JsonObjectConst>();
+      if (!object.containsKey("bitNo") || !object.containsKey("value"))
       {
-        uint8_t bit = (int)doc["bitNo"];
-        gpio[bit].alwaysWrite((int)doc["value"]);
-        Serial.print("GPIO Bit:");
-        Serial.println(bit);
+        Serial.println("/api/gpio/value/bit - invalid payload");
+        request->send(400, "application/json", "{\"error\":\"invalid GPIO value payload\"}");
+        return;
       }
-      else
+
+      const int bit = object["bitNo"].as<int>();
+      if ((bit < 0) || (bit >= kGpioCount))
       {
-        Serial.println("Deserialisationerror");
+        request->send(400, "application/json", "{\"error\":\"invalid bitNo\"}");
+        return;
       }
+
+      gpio[bit].alwaysWrite(object["value"].as<int>());
+      Serial.print("GPIO Bit:");
+      Serial.println(bit);
       request->send(200, "application/json", "OK");
     });
 
@@ -872,7 +912,7 @@ void setupWiFi()
       }
       else
       {
-        Serial.println("Deserialisationerror");
+        Serial.println("/api/mp3Player/config - Deserialisationerror");
       }
       request->send(200, "application/json", "OK");
     });
@@ -892,7 +932,7 @@ void setupWiFi()
       }
       else
       {
-        Serial.println("Deserialisationerror");
+        Serial.println("/api/action/play - Deserialisationerror");
       }
       request->send(200, "application/json", "OK");
     });
@@ -911,7 +951,7 @@ void setupWiFi()
       }
       else
       {
-        Serial.println("Deserialisationerror");
+        Serial.println("/api/action/stop - Deserialisationerror");
       }
       request->send(200, "application/json", "OK");
     });
@@ -931,7 +971,7 @@ void setupWiFi()
       }
       else
       {
-        Serial.println("Deserialisationerror");
+        Serial.println("/api/soundtrack/play - Deserialisationerror");
       }
       request->send(200, "application/json", "OK");
     });
@@ -951,7 +991,7 @@ void setupWiFi()
       }
       else
       {
-        Serial.println("Deserialisationerror");
+        Serial.println("/api/soundtrack/stop - Deserialisationerror");
       }
       request->send(200, "application/json", "OK");
     });
@@ -993,7 +1033,7 @@ void setupWiFi()
           DeserializationError error = deserializeJson(doc, (const char*)data);
           if(error)
           {
-              Serial.println("Deserialisationerror");
+              Serial.println("/api/nodeid/value - Deserialisationerror");
           }
           else
           {
@@ -1013,7 +1053,7 @@ void setupWiFi()
           DeserializationError error = deserializeJson(doc, (const char*)data);
           if(error)
           {
-              Serial.println("Deserialisationerror");
+              Serial.println("/api/brokerip/value - Deserialisationerror");
           }
           else
           {
@@ -1033,7 +1073,7 @@ void setupWiFi()
           DeserializationError error = deserializeJson(doc, (const char*)data);
           if(error)
           {
-              Serial.println("Deserialisationerror");
+              Serial.println("/api/gpio/config/bit - Deserialisationerror");
           }
           else
           {
@@ -1042,8 +1082,8 @@ void setupWiFi()
             const char* buff;
             buff = doc["name"].as<const char*>();
             strcpy(gpio[bit].name,buff);
-            gpio[bit].alwaysWrite((int) doc["value"]);
             gpio[bit].setType((int) doc["type"]);
+            gpio[bit].alwaysWrite((int) doc["value"]);
             gpio[bit].preset0 = (int) doc["preset0"];
             gpio[bit].preset1 = (int) doc["preset1"];
             gpio[bit].preset2 = (int) doc["preset2"];
@@ -1062,7 +1102,7 @@ void setupWiFi()
           DeserializationError error = deserializeJson(doc, (const char*)data);
           if(error)
           {
-              Serial.println("Deserialisationerror");
+              Serial.println("/api/soundtrack/config - Deserialisationerror");
           }
           else
           {
@@ -1084,7 +1124,7 @@ void setupWiFi()
           DeserializationError error = deserializeJson(doc, (const char*)data);
           if(error)
           {
-              Serial.println("Deserialisationerror");
+              Serial.println("/api/action/config - Deserialisationerror");
           }
           else
           {
@@ -1104,7 +1144,7 @@ void setupWiFi()
           DeserializationError error = deserializeJson(doc, (const char*)data);
           if(error)
           {
-              Serial.println("Deserialisationerror");
+              Serial.println("/api/gpio/value/bit - Deserialisationerror");
           }
           else
           {
@@ -1121,7 +1161,7 @@ void setupWiFi()
         DeserializationError error = deserializeJson(doc, (const char*)data);
         if(error)
         {
-           Serial.println("Deserialisationerror");
+           Serial.println("/api/mp3Player/config - Deserialisationerror");
         }
         else
         {
@@ -1137,7 +1177,7 @@ void setupWiFi()
           DeserializationError error = deserializeJson(doc, (const char*)data);
           if(error)
           {
-              Serial.println("Deserialisationerror");
+              Serial.println("/api/action/play - Deserialisationerror");
           }
           else
           {
@@ -1155,7 +1195,7 @@ void setupWiFi()
           DeserializationError error = deserializeJson(doc, (const char*)data);
           if(error)
           {
-              Serial.println("Deserialisationerror");
+              Serial.println("/api/action/stop - Deserialisationerror");
           }
           else
           {
@@ -1172,7 +1212,7 @@ void setupWiFi()
           DeserializationError error = deserializeJson(doc, (const char*)data);
           if(error)
           {
-              Serial.println("Deserialisationerror");
+              Serial.println("/api/soundtrack/play - Deserialisationerror");
           }
           else
           {
@@ -1190,7 +1230,7 @@ void setupWiFi()
           DeserializationError error = deserializeJson(doc, (const char*)data);
           if(error)
           {
-              Serial.println("Deserialisationerror");
+              Serial.println("/api/soundtrack/stop - Deserialisationerror");
           }
           else
           {

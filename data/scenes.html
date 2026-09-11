@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scenes</title>
+    <link rel="shortcut icon" href="/favicon" />
+    <style>
+      html {
+        font-family: Helvetica;
+        display: inline-block;
+        margin: 0 auto;
+        text-align: left;
+      }
+
+      body {
+        margin-top: 50px;
+      }
+
+      h1 {
+        color: #444444;
+        margin: auto 30px;
+        text-align: center;
+      }
+
+      table {
+        border: 1px solid black;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 8px;
+        border-bottom: 1px solid #444444;
+      }
+
+      tr:nth-child(odd) {
+        background-color: #d6eeee;
+      }
+
+      .error {
+        color: #b30000;
+        min-height: 1.5em;
+      }
+    </style>
+    <script src="/common.js"></script>
+    <script>
+      const SCENE_COUNT = 16;
+
+      async function init() {
+        renderSceneRows();
+        await loadAllScenes();
+      }
+
+      function renderSceneRows() {
+        const body = document.getElementById("sceneBody");
+        const rows = [];
+
+        for (let i = 0; i < SCENE_COUNT; i++) {
+          rows.push(`
+            <tr>
+              <td width="10%"><span id="index${i}">${i}</span></td>
+              <td width="60%"><span id="name${i}">Loading...</span></td>
+              <td width="30%"><button type="button" onclick="launchRun(${i})">Run</button></td>
+            </tr>
+          `);
+        }
+
+        body.innerHTML = rows.join("");
+      }
+
+      async function loadAllScenes() {
+        try {
+          const resp = await getJson("/api/scene/status/all");
+          for (const scene of resp.scenes) {
+            document.getElementById(`name${scene.index}`).innerText = scene.name;
+          }
+          setPageError("");
+        } catch (error) {
+          setPageError(`Failed to load scenes: ${error}`);
+        }
+      }
+
+      async function launchRun(index) {
+        try {
+          await postJson("/api/scene/run", { index: index });
+          setPageError("");
+        } catch (error) {
+          setPageError(`Failed to run scene ${index}: ${error}`);
+        }
+      }
+    </script>
+  </head>
+  <body onload="init()">
+    <h1>Scenes</h1>
+
+    <p id="error" class="error"></p>
+
+    <table width="100%" style="outline: 5px solid #1c6ea4; outline-offset: 0px">
+      <tr>
+        <th width="10%">Index</th>
+        <th width="60%">Name</th>
+        <th width="30%"></th>
+      </tr>
+      <tbody id="sceneBody"></tbody>
+    </table>
+
+    <br /><br />
+
+    <table width="100%" style="outline: 5px solid #1c6ea4; outline-offset: 0px">
+      <tr>
+        <td style="width: 20%"><a href="/page/node">node</a></td>
+        <td style="width: 20%"><a href="/page/gpio">gpio</a></td>
+        <td style="width: 20%"><a href="/page/action">action</a></td>
+        <td style="width: 20%"><a href="/page/sound">sound</a></td>
+        <td style="width: 20%"><a href="/page/objects">objects</a></td>
+        <td style="width: 20%"><a href="/page/scenes">scenes</a></td>
+      </tr>
+    </table>
+  </body>
+</html>

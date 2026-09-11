@@ -551,14 +551,14 @@ Serial.println(gcodePayload);
     // This is a GCode Driver Lock topic, payload is the lock value to set for GCode movement
 
     Serial.println("(MQTTcallback) GCode Driver Lock event");
-    sendGCodeFile("/lock.gcode");
+    MarlinSender("M106 S255");
   }
   else if (strncmp(topic, GCodeDriverUnlockTopic, strlen(GCodeDriverUnlockTopic)) == 0) 
   {
     // This is a GCode Driver Unlock topic, payload is the unlock value to set for GCode movement
 
     Serial.println("(MQTTcallback) GCode Driver Unlock event");
-    sendGCodeFile("/unlock.gcode");
+    MarlinSender("M106 S0");
 
   }
 
@@ -576,15 +576,13 @@ Serial.println(gcodePayload);
   if (strncmp(topic, actionTopic, 13) == 0) 
   {
     // This is an Action topic
-    // Payload is
-    // P for play, L for Loop (play with repeat), S for stop
+    // Payload is a single character indicating the action: 'T' to play the associated action (Scene)
+    // The scene index is extracted from the topic itself rather than the payload.
     event = (topic[16]-0x30);
     if (event > 9)event -= 7;
     Serial.print("(MQTTcallback) Action event:");
     Serial.println(event);
-    if ((char)payload[0] == 'P')action[event].play(CMD_REMOTE,false);
-    else if ((char)payload[0] == 'L')action[event].play(CMD_REMOTE,true);
-    else if ((char)payload[0] == 'S')action[event].stop(CMD_REMOTE);
+    if ((char)payload[0] == 'T')scenes[event].run();
   }
 }
 

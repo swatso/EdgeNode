@@ -25,11 +25,14 @@ void setup()
   setupWiFi();
   setupMQTTServices();
   setupMQTTComms();
+  // setupGPIO() must run before setupUserCode() so its SPIFFS-loaded config
+  // is in place before UserCode.cpp's hardcoded gpio[].setType() calls run,
+  // letting the hardcoded types intentionally take precedence over stale SPIFFS config.
+  setupGPIO();
   setupUserCode();
   mp3.loadConfig();
   //setupAction();
   //loadActionConfig();
-  setupGPIO();
   loadServoPositions();
   setupSound();
   powerGPIO(true);

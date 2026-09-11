@@ -13,7 +13,7 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 
-#define MarlinDebug
+//#define MarlinDebug
 //#define PrintMarlinLines
 
 Pose currentPose = {0.0F, 0.0F, 90.0F};
@@ -115,14 +115,18 @@ bool waitForSDPrintDone(const char* context, uint32_t doneBaseline, uint32_t fai
                          uint32_t timeoutMs = kMarlinSDPrintTimeoutMs)
 {
   const uint32_t waitStartMs = millis();
+#ifdef MarlinDebug
   uint32_t lastLogMs = waitStartMs;
   const uint32_t rxCountAtStart = marlinRxLineCount;
+#endif
 
   while (sdPrintCompletionCount == doneBaseline)
   {
     if (sdPrintFailureCount != failureBaseline)
     {
+#ifdef MarlinDebug
       Serial.printf("[waitForSDPrintDone] FAILED context=%s Marlin reported an SD file error, aborting wait\n", context);
+#endif
       return false;
     }
 
@@ -130,14 +134,17 @@ bool waitForSDPrintDone(const char* context, uint32_t doneBaseline, uint32_t fai
     if ((timeoutMs > 0) && ((nowMs - waitStartMs) >= timeoutMs))
     {
       localDebug.println(String("Timeout waiting for SD print completion in ") + context);
+#ifdef MarlinDebug
       Serial.printf("[waitForSDPrintDone] TIMEOUT context=%s waited=%lu ms linesReceived=%u lastRx=%lu ms ago\n",
                     context,
                     static_cast<unsigned long>(nowMs - waitStartMs),
                     static_cast<unsigned>(marlinRxLineCount - rxCountAtStart),
                     static_cast<unsigned long>((lastMarlinRxMs == 0) ? 0 : (nowMs - lastMarlinRxMs)));
+#endif
       return false;
     }
 
+#ifdef MarlinDebug
     if ((nowMs - lastLogMs) >= 1000)
     {
       Serial.printf("[waitForSDPrintDone] context=%s elapsed=%lu ms baseline=%u current=%u linesReceived=%u lastRx=%lu ms ago\n",
@@ -149,6 +156,7 @@ bool waitForSDPrintDone(const char* context, uint32_t doneBaseline, uint32_t fai
                     static_cast<unsigned long>((lastMarlinRxMs == 0) ? 0 : (nowMs - lastMarlinRxMs)));
       lastLogMs = nowMs;
     }
+#endif
 
     vTaskDelay(kMarlinWaitSliceTicks);
   }
@@ -455,16 +463,20 @@ void handleMarlinFeedbackLine(const char* line)
   if ((line != nullptr) && (strstr(line, "open failed") != nullptr))
   {
     ++sdPrintFailureCount;
+#ifdef MarlinDebug
     Serial.printf("[MarlinSender] Detected SD file error from Marlin: '%s', count=%u\n", line,
                   static_cast<unsigned>(sdPrintFailureCount));
+#endif
     return;
   }
 
   if ((line != nullptr) && (strstr(line, "Done printing file") != nullptr))
   {
     ++sdPrintCompletionCount;
+#ifdef MarlinDebug
     Serial.printf("[MarlinSender] Detected 'Done printing file' from Marlin, count=%u\n",
                   static_cast<unsigned>(sdPrintCompletionCount));
+#endif
     return;
   }
 
@@ -551,6 +563,7 @@ void sdPathTask(void* pvParameters)
 }
 
 GCodeObject gcodeObjects[kObjectCount];
+Scene scenes[kSceneCount];
 
 // Forward declarations
 void updatePoseFromLine(char* line);
@@ -650,17 +663,22 @@ void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
   gcodeObjects[15].setName("ShedB-door");
   gcodeObjects[15].setRFIDTag("00EEEC76");
 
-  //MarlinSender("G28");  //debug
+  for (uint8_t i = 0; i < kSceneCount; ++i)
+  {
+    char defaultName[20];
+    snprintf(defaultName, sizeof(defaultName), "Scene%u", static_cast<unsigned>(i));
+    scenes[i].setName(defaultName);
+    scenes[i].setSound(0);
+    char defaultPath[64];
+    snprintf(defaultPath, sizeof(defaultPath), "Scenes/SCN_%u.GCO", static_cast<unsigned>(i));
+    scenes[i].setPath(defaultPath);
+  }
+  scenes[0].setName("Tarmac Laying");
+  scenes[1].setName("Canopy Signs");
+  scenes[2].setName("Carrying Materials");
 
   setSpeedPercent(100); // Ensure the speed percentage is applied before homing
   runSDPath("System/HomePuck.GCO");
-  // Run homing asynchronously via sceneRunTask so setup() (and MQTT/WiFi/webserver bring-up) isn't
-  // blocked for the ~15-20s the SD homing scene can take - blocking here previously left the WiFi/
-  // MQTT stack starved for CPU time long enough to leave the broker socket in a stuck EAGAIN state. 
- /* if (!queueSceneRun(100))
-  {
-    Serial.println("[initGCodeControl] ERROR: failed to queue boot-time homing scene (100)");
-  } */
 }
 
 void setSpeed(int speed)
@@ -715,12 +733,15 @@ void MarlinSender(const char* line) {
     return;
   }
 
-
+#ifdef MarlinDebug
   Serial.printf("[MarlinSender] begin line='%s'    ", line);
+#endif
 
 
   const uint32_t waitStartMs = millis();
+#ifdef MarlinDebug
   uint32_t lastWaitLogMs = waitStartMs;
+#endif
   size_t waitIterations = 0;
 
   while (!handshake.canSendNow()) {
@@ -731,23 +752,25 @@ void MarlinSender(const char* line) {
     const uint32_t nowMs = millis();
     if (handshake.isAckStalled(kMarlinAckTimeoutMs, nowMs))
     {
+#ifdef MarlinDebug
       Serial.printf("[MarlinSender] WARNING: ACK stalled for %lu ms, resetting handshake state before line='%s'\n",
                     static_cast<unsigned long>(nowMs - waitStartMs),
                     line);
+#endif
       handshake.reset();
       break;
     }
 
+#ifdef MarlinDebug
     if ((nowMs - lastWaitLogMs) >= 1000)
     {
-#ifdef MarlinDebug
       Serial.printf("[MarlinSender] waiting canSendNow elapsed=%lu ms iterations=%u line='%s'\n",
                     static_cast<unsigned long>(nowMs - waitStartMs),
                     static_cast<unsigned>(waitIterations),
                     line);
-#endif
       lastWaitLogMs = nowMs;
     }
+#endif
 
     // Wait until it's safe to send the next command
     vTaskDelay(kMarlinWaitSliceTicks);
@@ -1488,17 +1511,16 @@ void loadGCodeObject()
   runSDPathBlocking("System/RFID_0.GCO");
   if (RFIDObjectIndex != -1)
   {
-    runSDPathBlocking("System/RFID_1.GCO"); // Move the object past the RFID reader
+    runSDPathBlocking("System/RFID_2.GCO"); // Move the object past the RFID reader
     localDebug.println("Object detected after first move, sent path to home the puck");
   }
   else
   {
-    runSDPathBlocking("System/RFID_2.GCO"); // Run the path to move the object closer to the RFID reader
+    runSDPathBlocking("System/RFID_1.GCO"); // Run the path to move the object closer to the RFID reader
     localDebug.println("No object detected after first move, sent alternate path to move closer to RFID reader");
   }
 
-  vTaskDelay(1000 / portTICK_PERIOD_MS);
-
+  vTaskDelay(10 / portTICK_PERIOD_MS);
   RFIDEnable = false; // disable the RFID reader now that detection window has closed
 
   if (RFIDObjectIndex != -1)

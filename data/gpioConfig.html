@@ -51,6 +51,7 @@
     <script src="/common.js"></script>
     <script>
       let bit = "0";
+      let currentValue = 0;
 
       const GPIO_TYPES = [
         { value: 0, text: "None", id: "type0" },
@@ -234,6 +235,7 @@
         const resp = await getJson(`/api/gpio/config/bit?bitno=${bitValue}`);
 
         document.getElementById("Name").value = resp.name;
+        currentValue = Number(resp.value);
         document.getElementById(`type${resp.type}`).checked = true;
         document.getElementById("Preset0").value = resp.preset0;
         document.getElementById("Preset1").value = resp.preset1;
@@ -249,6 +251,7 @@
         try {
           const out = {
             bitNo: Number(bit),
+            value: currentValue,
             name: document.getElementById("Name").value,
             type: selectedTypeValue(),
             preset0: Number(document.getElementById("Preset0").value),

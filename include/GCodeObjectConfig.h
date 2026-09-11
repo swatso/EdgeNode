@@ -9,6 +9,7 @@ struct Pose {
 };
 
 constexpr uint8_t kObjectCount = 16;  //0..15 = selectable Objects
+constexpr uint8_t kSceneCount = 16;    //0..15 = selectable Scenes
 
 const Pose kDefaultObjectPose = {0.0F, 0.0F, 90.0F};
 

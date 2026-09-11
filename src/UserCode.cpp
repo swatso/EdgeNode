@@ -40,11 +40,8 @@ void setupUserCode()
       Serial.println("Failed to create MarlinCNCTask");
     }*/
 
-    gpio[0].setType(GPIO_PWM_PULSE); // Set GPIO 0 to PWM mode (for example purposes, you can change this to any other type and GPIO as needed)
-    gpio[0].preset0 = 250;    // Mark Period in mS (applies to GPIO_PWM_PULSE)
-    gpio[0].preset1 = 20;    // Off PWM setting (0 to 255) (applies to GPIO_PWM_PULSE)
-    gpio[0].preset2 = 200;   // On PWM setting (0 to 255) (applies to GPIO_PWM_PULSE)
-    gpio[0].rate = 1000;     // Overall pulse cycle in mS (applies to GPIO_PWM_PULSE)
+    gpio[0].setType(GPIO_DIGOUT); 
+    gpio[1].setType(GPIO_DIGOUT); 
     
     gpio[0x0D].setType(GPIO_NONE);    // Used for serial interface to Marlin
     gpio[0x0E].setType(GPIO_NONE);    // Used for serial interface to Marlin

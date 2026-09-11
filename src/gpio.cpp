@@ -253,7 +253,7 @@ void gpioPin::alwaysWrite(int demand)
     xSemaphoreTake(lock,portMAX_DELAY);
     Serial.println("gotSemaphore");
     write(demand);
-    Serial.println("writted");
+    Serial.println("written");
     xSemaphoreGive(lock);
     Serial.println("done");
   }
@@ -295,6 +295,7 @@ void gpioPin::write(int demand)
   {
     if((type == GPIO_DIGOUT)||(type == GPIO_DIGOUT_PULSE))
     {
+      Serial.print("digitalWrite demand:");
       Serial.println(demand);
       digitalWrite(pin,demand);
       value = demand;

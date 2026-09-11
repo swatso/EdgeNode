@@ -73,4 +73,39 @@ extern int currentObjectIndex;
 extern Pose currentPose;
 extern void loadGCodeObject(int index);
 void setSpeed(int speed);
+
+class Scene
+{
+public:
+  char name[20];  // friendly name for this scene
+  uint8_t sound;  // index of the sound to play when this scene runs
+  char path[64];  // SD path (folder) associated with this scene, e.g. "SCN_0"
+
+  Scene() : sound(0) {
+    name[0] = '\0';
+    path[0] = '\0';
+  }
+
+  void setName(const char* newName) {
+    strncpy(name, newName, sizeof(name) - 1);
+    name[sizeof(name) - 1] = '\0';
+  }
+
+  void setSound(uint8_t newSound) {
+    sound = newSound;
+  }
+
+  void setPath(const char* newPath) {
+    strncpy(path, newPath, sizeof(path) - 1);
+    path[sizeof(path) - 1] = '\0';
+  }
+
+  // TODO: flesh out full scene execution logic; for now just kick off the SD path run.
+  bool run() {
+    return runSDPath(path);
+  }
+};
+
+extern Scene scenes[kSceneCount]; // Array to hold up to 16 Scenes
+
 #endif // GCODECONTROL_H
