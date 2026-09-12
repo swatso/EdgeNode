@@ -764,36 +764,39 @@ void setupWiFi()
       ESP.restart();
     });
 
-    server.on("/api/nodeid/value", HTTP_POST, [](AsyncWebServerRequest *request) {
-      String body = request->arg("plain");
-      JsonDocument doc;
-      DeserializationError error = deserializeJson(doc, body);
-      if (!error)
+    server.on("/api/nodeid/value", HTTP_POST, [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObjectConst doc = json.as<JsonObjectConst>();
+      if (!doc.containsKey("value"))
       {
-        const char* nodeID = doc["value"].as<const char*>();
+        Serial.println("/api/nodeid/value - Deserialisationerror");
+        request->send(400, "application/json", "{\"error\":\"invalid nodeid payload\"}");
+        return;
+      }
+
+      const char* nodeID = doc["value"].as<const char*>();
+      if (nodeID != nullptr)
+      {
         node.setNodeID(strtol(nodeID, nullptr, 16));
         writeFile(SPIFFS, nodeIDPath, node.getNodeIDstring());
-      }
-      else
-      {
-        Serial.println("Deserialisationerror");
       }
       request->send(200, "application/json", "OK");
     });
 
-    server.on("/api/brokerip/value", HTTP_POST, [](AsyncWebServerRequest *request) {
-      String body = request->arg("plain");
-      JsonDocument doc;
-      DeserializationError error = deserializeJson(doc, body);
-      if (!error)
+    server.on("/api/brokerip/value", HTTP_POST, [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObjectConst doc = json.as<JsonObjectConst>();
+      if (!doc.containsKey("value"))
       {
-        const char* buff = doc["value"].as<const char*>();
-        writeFile(SPIFFS, brokerIPPath, buff);
-        strcpy(node.brokerIP, buff);
+        Serial.println("/api/brokerip/value - Deserialisationerror");
+        request->send(400, "application/json", "{\"error\":\"invalid brokerip payload\"}");
+        return;
       }
-      else
+
+      const char* buff = doc["value"].as<const char*>();
+      if (buff != nullptr)
       {
-        Serial.println("Deserialisationerror");
+        writeFile(SPIFFS, brokerIPPath, buff);
+        strncpy(node.brokerIP, buff, sizeof(node.brokerIP) - 1);
+        node.brokerIP[sizeof(node.brokerIP) - 1] = '\0';
       }
       request->send(200, "application/json", "OK");
     });
@@ -836,45 +839,61 @@ void setupWiFi()
       request->send(200, "application/json", "OK");
     });
 
-    server.on("/api/soundtrack/config", HTTP_POST, [](AsyncWebServerRequest *request) {
-      String body = request->arg("plain");
-      JsonDocument doc;
-      DeserializationError error = deserializeJson(doc, body);
-      if (!error)
-      {
-        uint8_t trackNo = (int)doc["trackNo"];
-        const char* buff = doc["name"].as<const char*>();
-        strcpy(mp3.track[trackNo].name, buff);
-        mp3.track[trackNo].duration = (int)doc["duration"];
-        mp3.track[trackNo].volume = (int)doc["volume"];
-        mp3.track[trackNo].enableRemote = doc["enableRemote"];
-        mp3.track[trackNo].enableLocal = doc["enableLocal"];
-        writeMP3TrackConfigFile(SPIFFS, trackNo);
-      }
-      else
+    server.on("/api/soundtrack/config", HTTP_POST, [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObjectConst doc = json.as<JsonObjectConst>();
+      if (!doc.containsKey("trackNo") || !doc.containsKey("name"))
       {
         Serial.println("/api/soundtrack/config - Deserialisationerror");
+        request->send(400, "application/json", "{\"error\":\"invalid soundtrack config payload\"}");
+        return;
       }
+
+      uint8_t trackNo = doc["trackNo"].as<int>();
+      if (trackNo >= kTrackCount)
+      {
+        request->send(400, "application/json", "{\"error\":\"invalid trackNo\"}");
+        return;
+      }
+
+      const char* buff = doc["name"].as<const char*>();
+      if (buff != nullptr)
+      {
+        strncpy(mp3.track[trackNo].name, buff, sizeof(mp3.track[trackNo].name) - 1);
+        mp3.track[trackNo].name[sizeof(mp3.track[trackNo].name) - 1] = '\0';
+      }
+      mp3.track[trackNo].duration = doc["duration"].as<int>();
+      mp3.track[trackNo].volume = doc["volume"].as<int>();
+      mp3.track[trackNo].enableRemote = doc["enableRemote"].as<bool>();
+      mp3.track[trackNo].enableLocal = doc["enableLocal"].as<bool>();
+      writeMP3TrackConfigFile(SPIFFS, trackNo);
       request->send(200, "application/json", "OK");
     });
 
-    server.on("/api/action/config", HTTP_POST, [](AsyncWebServerRequest *request) {
-      String body = request->arg("plain");
-      JsonDocument doc;
-      DeserializationError error = deserializeJson(doc, body);
-      if (!error)
-      {
-        uint8_t number = (int)doc["number"];
-        const char* buff = doc["name"].as<const char*>();
-        strcpy(action[number].name, buff);
-        action[number].enableRemote = doc["enableRemote"];
-        action[number].enableLocal = doc["enableLocal"];
-        writeActionConfigFile(SPIFFS, number);
-      }
-      else
+    server.on("/api/action/config", HTTP_POST, [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObjectConst doc = json.as<JsonObjectConst>();
+      if (!doc.containsKey("number") || !doc.containsKey("name"))
       {
         Serial.println("/api/action/config - Deserialisationerror");
+        request->send(400, "application/json", "{\"error\":\"invalid action config payload\"}");
+        return;
       }
+
+      uint8_t number = doc["number"].as<int>();
+      if (number >= kActionCount)
+      {
+        request->send(400, "application/json", "{\"error\":\"invalid action number\"}");
+        return;
+      }
+
+      const char* buff = doc["name"].as<const char*>();
+      if (buff != nullptr)
+      {
+        strncpy(action[number].name, buff, sizeof(action[number].name) - 1);
+        action[number].name[sizeof(action[number].name) - 1] = '\0';
+      }
+      action[number].enableRemote = doc["enableRemote"].as<bool>();
+      action[number].enableLocal = doc["enableLocal"].as<bool>();
+      writeActionConfigFile(SPIFFS, number);
       request->send(200, "application/json", "OK");
     });
 
@@ -900,352 +919,90 @@ void setupWiFi()
       request->send(200, "application/json", "OK");
     });
 
-    server.on("/api/mp3Player/config", HTTP_POST, [](AsyncWebServerRequest *request) {
-      String body = request->arg("plain");
-      JsonDocument doc;
-      DeserializationError error = deserializeJson(doc, body);
-      if (!error)
-      {
-        mp3.manualTrim = doc["manualTrim"];
-        mp3.autoTrim = doc["autoTrim"];
-        writeMP3ConfigFile(SPIFFS);
-      }
-      else
+    server.on("/api/mp3Player/config", HTTP_POST, [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObjectConst doc = json.as<JsonObjectConst>();
+      if (!doc.containsKey("manualTrim") || !doc.containsKey("autoTrim"))
       {
         Serial.println("/api/mp3Player/config - Deserialisationerror");
-      }
-      request->send(200, "application/json", "OK");
-    });
-
-    server.on("/api/action/play", HTTP_POST, [](AsyncWebServerRequest *request) {
-      String body = request->arg("plain");
-      JsonDocument doc;
-      DeserializationError error = deserializeJson(doc, body);
-      if (!error)
-      {
-        int number = (int)doc["number"];
-        bool loop = doc["loop"];
-        if ((number >= 0) && (number < 16))
-        {
-          action[number].play(CMD_ANY, loop);
-        }
-      }
-      else
-      {
-        Serial.println("/api/action/play - Deserialisationerror");
-      }
-      request->send(200, "application/json", "OK");
-    });
-
-    server.on("/api/action/stop", HTTP_POST, [](AsyncWebServerRequest *request) {
-      String body = request->arg("plain");
-      JsonDocument doc;
-      DeserializationError error = deserializeJson(doc, body);
-      if (!error)
-      {
-        int number = (int)doc["number"];
-        if ((number >= 0) && (number < 16))
-        {
-          action[number].stop(CMD_ANY);
-        }
-      }
-      else
-      {
-        Serial.println("/api/action/stop - Deserialisationerror");
-      }
-      request->send(200, "application/json", "OK");
-    });
-
-    server.on("/api/soundtrack/play", HTTP_POST, [](AsyncWebServerRequest *request) {
-      String body = request->arg("plain");
-      JsonDocument doc;
-      DeserializationError error = deserializeJson(doc, body);
-      if (!error)
-      {
-        int track = (int)doc["track"];
-        bool loop = doc["loop"];
-        if ((track >= 0) && (track < 16))
-        {
-          mp3.play(CMD_ANY, track, loop);
-        }
-      }
-      else
-      {
-        Serial.println("/api/soundtrack/play - Deserialisationerror");
-      }
-      request->send(200, "application/json", "OK");
-    });
-
-    server.on("/api/soundtrack/stop", HTTP_POST, [](AsyncWebServerRequest *request) {
-      String body = request->arg("plain");
-      JsonDocument doc;
-      DeserializationError error = deserializeJson(doc, body);
-      if (!error)
-      {
-        int track = (int)doc["track"];
-        mp3.stop(CMD_ANY);
-        if ((track >= 0) && (track < 16))
-        {
-          mp3.stop(CMD_ANY);
-        }
-      }
-      else
-      {
-        Serial.println("/api/soundtrack/stop - Deserialisationerror");
-      }
-      request->send(200, "application/json", "OK");
-    });
-
-    // Handle POST requests
-    // ********************
-    server.onRequestBody([](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) 
-    {
-      Serial.println(request->url());
-
-      if ((request->url() == "/api/object/identify") ||
-          (request->url() == "/api/node/restart") ||
-          (request->url() == "/api/nodeid/value") ||
-          (request->url() == "/api/brokerip/value") ||
-          (request->url() == "/api/gpio/config/bit") ||
-          (request->url() == "/api/soundtrack/config") ||
-          (request->url() == "/api/action/config") ||
-          (request->url() == "/api/gpio/value/bit") ||
-          (request->url() == "/api/mp3Player/config") ||
-          (request->url() == "/api/action/play") ||
-          (request->url() == "/api/action/stop") ||
-          (request->url() == "/api/soundtrack/play") ||
-          (request->url() == "/api/soundtrack/stop"))
-      {
+        request->send(400, "application/json", "{\"error\":\"invalid mp3Player config payload\"}");
         return;
       }
 
-      if (request->url() == "/api/node/restart") 
+      mp3.manualTrim = doc["manualTrim"].as<int>();
+      mp3.autoTrim = doc["autoTrim"].as<int>();
+      writeMP3ConfigFile(SPIFFS);
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/action/play", HTTP_POST, [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObjectConst doc = json.as<JsonObjectConst>();
+      if (!doc.containsKey("number"))
       {
-//        Serial.println("Restart Requested");
-        powerGPIO(false);
-        delay(1000);
-        ESP.restart();
+        Serial.println("/api/action/play - Deserialisationerror");
+        request->send(400, "application/json", "{\"error\":\"invalid action play payload\"}");
+        return;
       }
 
-      if (request->url() == "/api/nodeid/value") 
+      int number = doc["number"].as<int>();
+      bool loop = doc["loop"].as<bool>();
+      if ((number >= 0) && (number < kActionCount))
       {
-          JsonDocument doc;
-          DeserializationError error = deserializeJson(doc, (const char*)data);
-          if(error)
-          {
-              Serial.println("/api/nodeid/value - Deserialisationerror");
-          }
-          else
-          {
-            const char* nodeID = doc["value"].as<const char*>();
-//            Serial.print("MQTT NodeID:");
-//            Serial.println(nodeID);    
-            node.setNodeID(strtol(nodeID,NULL,16));
-            writeFile(SPIFFS, nodeIDPath, node.getNodeIDstring());
-//            Serial.print("MQTT NodeID:");
-//            Serial.println(node.getNodeIDstring());
-          }
+        action[number].play(CMD_ANY, loop);
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/action/stop", HTTP_POST, [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObjectConst doc = json.as<JsonObjectConst>();
+      if (!doc.containsKey("number"))
+      {
+        Serial.println("/api/action/stop - Deserialisationerror");
+        request->send(400, "application/json", "{\"error\":\"invalid action stop payload\"}");
+        return;
       }
 
-      if (request->url() == "/api/brokerip/value") 
+      int number = doc["number"].as<int>();
+      if ((number >= 0) && (number < kActionCount))
       {
-          JsonDocument doc;
-          DeserializationError error = deserializeJson(doc, (const char*)data);
-          if(error)
-          {
-              Serial.println("/api/brokerip/value - Deserialisationerror");
-          }
-          else
-          {
-            //String bIP = doc["value"];
-            const char* buff;
-            buff = doc["value"].as<const char*>();
-            writeFile(SPIFFS, brokerIPPath, buff); 
-            strcpy(node.brokerIP,buff);
-            //Serial.print("MQTT brokerIP:");
-            //Serial.println(node.brokerIP);
-          }
+        action[number].stop(CMD_ANY);
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/soundtrack/play", HTTP_POST, [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObjectConst doc = json.as<JsonObjectConst>();
+      if (!doc.containsKey("track"))
+      {
+        Serial.println("/api/soundtrack/play - Deserialisationerror");
+        request->send(400, "application/json", "{\"error\":\"invalid soundtrack play payload\"}");
+        return;
       }
 
-      if (request->url() == "/api/gpio/config/bit") 
+      int track = doc["track"].as<int>();
+      bool loop = doc["loop"].as<bool>();
+      if ((track >= 0) && (track < kTrackCount))
       {
-          JsonDocument doc;
-          DeserializationError error = deserializeJson(doc, (const char*)data);
-          if(error)
-          {
-              Serial.println("/api/gpio/config/bit - Deserialisationerror");
-          }
-          else
-          {
-            //Serial.println("config/bit");
-            uint8_t bit = (int) doc["bitNo"];
-            const char* buff;
-            buff = doc["name"].as<const char*>();
-            strcpy(gpio[bit].name,buff);
-            gpio[bit].setType((int) doc["type"]);
-            gpio[bit].alwaysWrite((int) doc["value"]);
-            gpio[bit].preset0 = (int) doc["preset0"];
-            gpio[bit].preset1 = (int) doc["preset1"];
-            gpio[bit].preset2 = (int) doc["preset2"];
-            gpio[bit].rate = (int) doc["rate"];
-            gpio[bit].enableRemote = doc["enableRemote"];
-            gpio[bit].enableLocal = doc["enableLocal"];
-            gpio[bit].setPublishRate ((int) doc["publishRate"]);
-            gpio[bit].setEasingType((int) doc["easingType"]);
-            writeConfigFile(SPIFFS,bit);
-           }
+        mp3.play(CMD_ANY, track, loop);
+      }
+      request->send(200, "application/json", "OK");
+    });
+
+    server.on("/api/soundtrack/stop", HTTP_POST, [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObjectConst doc = json.as<JsonObjectConst>();
+      if (!doc.containsKey("track"))
+      {
+        Serial.println("/api/soundtrack/stop - Deserialisationerror");
+        request->send(400, "application/json", "{\"error\":\"invalid soundtrack stop payload\"}");
+        return;
       }
 
-      if (request->url() == "/api/soundtrack/config") 
+      int track = doc["track"].as<int>();
+      if ((track >= 0) && (track < kTrackCount))
       {
-          JsonDocument doc;
-          DeserializationError error = deserializeJson(doc, (const char*)data);
-          if(error)
-          {
-              Serial.println("/api/soundtrack/config - Deserialisationerror");
-          }
-          else
-          {
-            uint8_t trackNo = (int) doc["trackNo"];
-            const char* buff;
-            buff = doc["name"].as<const char*>();
-            strcpy(mp3.track[trackNo].name,buff);
-            mp3.track[trackNo].duration = (int) doc["duration"];
-            mp3.track[trackNo].volume = (int) doc["volume"]; 
-            mp3.track[trackNo].enableRemote = doc["enableRemote"];
-            mp3.track[trackNo].enableLocal = doc["enableLocal"];
-            writeMP3TrackConfigFile(SPIFFS,trackNo);
-          }
+        mp3.stop(CMD_ANY);
       }
-
-      if (request->url() == "/api/action/config") 
-      {
-          JsonDocument doc;
-          DeserializationError error = deserializeJson(doc, (const char*)data);
-          if(error)
-          {
-              Serial.println("/api/action/config - Deserialisationerror");
-          }
-          else
-          {
-            uint8_t number = (int) doc["number"];
-            const char* buff;
-            buff = doc["name"].as<const char*>();
-            strcpy(action[number].name,buff);
-            action[number].enableRemote = doc["enableRemote"];
-            action[number].enableLocal = doc["enableLocal"];
-            writeActionConfigFile(SPIFFS,number);
-          }
-      }
-
-      if (request->url() == "/api/gpio/value/bit") 
-      {
-          JsonDocument doc;
-          DeserializationError error = deserializeJson(doc, (const char*)data);
-          if(error)
-          {
-              Serial.println("/api/gpio/value/bit - Deserialisationerror");
-          }
-          else
-          {
-            uint8_t bit = (int) doc["bitNo"];
-            gpio[bit].alwaysWrite((int) doc["value"]);
-            Serial.print("GPIO Bit:");
-            Serial.println(bit);
-           }
-      }
-
-      if (request->url() == "/api/mp3Player/config") 
-      {
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, (const char*)data);
-        if(error)
-        {
-           Serial.println("/api/mp3Player/config - Deserialisationerror");
-        }
-        else
-        {
-          mp3.manualTrim = doc["manualTrim"];
-          mp3.autoTrim =doc["autoTrim"];
-          writeMP3ConfigFile(SPIFFS);
-        }
-      }
-      
-      if (request->url() == "/api/action/play") 
-      {
-          JsonDocument doc;
-          DeserializationError error = deserializeJson(doc, (const char*)data);
-          if(error)
-          {
-              Serial.println("/api/action/play - Deserialisationerror");
-          }
-          else
-          {
-//            Serial.print("action: ");
-            int number = (int) doc["number"];
-            bool loop = doc["loop"];
-            if((number >= 0)&&(number<16))action[number].play(CMD_ANY,loop);             
-//            Serial.println(number);
-          }
-      }
-
-      if (request->url() == "/api/action/stop") 
-      {
-          JsonDocument doc;
-          DeserializationError error = deserializeJson(doc, (const char*)data);
-          if(error)
-          {
-              Serial.println("/api/action/stop - Deserialisationerror");
-          }
-          else
-          {
-            //Serial.print("action: ");
-            int number = (int) doc["number"];
-            if((number >= 0)&&(number<16))action[number].stop(CMD_ANY);             
-            //Serial.println(number);
-          }
-      }
-
-      if (request->url() == "/api/soundtrack/play") 
-      {
-          JsonDocument doc;
-          DeserializationError error = deserializeJson(doc, (const char*)data);
-          if(error)
-          {
-              Serial.println("/api/soundtrack/play - Deserialisationerror");
-          }
-          else
-          {
-//            Serial.print("track: ");
-            int track = (int) doc["track"];
-            bool loop = doc["loop"];
-            if((track >= 0)&&(track<16))mp3.play(CMD_ANY,track,loop);             
-//            Serial.println(track);
-          }
-      }
-
-      if (request->url() == "/api/soundtrack/stop") 
-      {
-          JsonDocument doc;
-          DeserializationError error = deserializeJson(doc, (const char*)data);
-          if(error)
-          {
-              Serial.println("/api/soundtrack/stop - Deserialisationerror");
-          }
-          else
-          {
-            //Serial.print("track: ");
-            int track = (int) doc["track"];
-            mp3.stop(CMD_ANY);
-            if((track >= 0)&&(track<16))mp3.stop(CMD_ANY);             
-            //Serial.println(track);
-          }
-      }
-
-
-      //Serial.println("200");
-      request->send(200,"application/json","OK");
-    });      
+      request->send(200, "application/json", "OK");
+    });
 
     server.serveStatic("/", SPIFFS, "/");
     server.begin();

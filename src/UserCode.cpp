@@ -32,19 +32,22 @@ void setupUserCode()
     // For example, to set the play and stop functions for Action 0 to the template functions defined below:
 
     // hardcode GPIO types here
-    initGCodeControl();
+    //initGCodeControl();     // GCode Control is not part of the Victoria Centre controller
 
-    // Create a helper task for Marlin handshake processing
-    /*if (xTaskCreatePinnedToCore(MarlinCNCHelper, "MarlinCNCTask", 3000, nullptr, 1, &MarlinCNCTask, 0) != pdPASS)
-    {
-      Serial.println("Failed to create MarlinCNCTask");
-    }*/
-
-    gpio[0].setType(GPIO_DIGOUT); 
-    gpio[1].setType(GPIO_DIGOUT); 
-    
-    gpio[0x0D].setType(GPIO_NONE);    // Used for serial interface to Marlin
-    gpio[0x0E].setType(GPIO_NONE);    // Used for serial interface to Marlin
+    gpio[0].setType(GPIO_PWM);          // Crane rotation speed demand
+    strcpy(gpio[0].name, "Crane rotation spd");
+    gpio[1].setType(GPIO_DIGOUT);       // Crane rotation direction
+    strcpy(gpio[1].name, "Crane rotation dir");
+    gpio[2].setType(GPIO_DIGIN);        // Crane hoist limit switch0 (Hall sensor)
+    strcpy(gpio[2].name, "Hoist limit sw0");
+    gpio[3].setType(GPIO_DIGIN);        // Crane hoist limit switch1 (Hall sensor)
+    strcpy(gpio[3].name, "Hoist limit sw1");
+    gpio[4].setType(GPIO_SERVO);        // Crane hoist control
+    strcpy(gpio[4].name, "Crane hoist ctrl");
+    gpio[5].setType(GPIO_PWM);          // Crane lights
+    strcpy(gpio[5].name, "Crane lights");
+    gpio[6].setType(GPIO_PWM);          // Building Feature Lights
+    strcpy(gpio[6].name, "Building Lights");
 
     // hardcode sound configuration here
     strcpy(mp3.track[0].name, "Ambient");

@@ -4,10 +4,13 @@ IO and Edge Compute Node with Web Configuration and MQTT interface (eg to JMRI)
 
 EdgeNode turns an ESP32 microcontroller into a smart, networked edge device for controlling GPIOs, servos, PWM outputs, audio playback, and user-defined action sequences — all configurable over WiFi via a browser and controllable via MQTT.
 
+This controller handles:
+- Control of the feature Animations
+- 
 ## Documentation
 
 Full project documentation is available in the [`docs/`](docs/) directory:
-
+Refer to the Edge Node documentation for more details on setting up and using the platform.
 - [Introduction & Quick Start](docs/Home.md)
 - [Features Overview](docs/Features-Overview.md)
 - [Installation Guide](docs/Installation-Guide.md)
