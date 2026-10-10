@@ -162,7 +162,7 @@ void loadServoPositions()
 //    Serial.println(position);
     if((position >= 0) && (position <= 180) && ((gpio[bit].type == GPIO_SERVO)||(gpio[bit].type == GPIO_SERVO_ACTUATOR)))
     {
-      //Serial.printf("Loaded position for servo %d: %d\n", bit, position);
+      Serial.printf("Loaded position for servo %d: %d\n", bit, position);
       gpio[bit].initValue(position);
     }
   }

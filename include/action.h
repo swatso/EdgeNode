@@ -17,6 +17,7 @@ void loadActionConfig();
 #define CMD_REMOTE 2
 
 // Action States
+#define ACTION_INIT      255
 #define ACTION_STOPPED    0
 #define ACTION_PLAYING    1
 #define ACTION_PLAYED     2
@@ -36,6 +37,7 @@ class edgeAction
     bool enableLocal;
     bool enableRemote;
     edgeAction();
+    void init();
     void play(uint8_t source, boolean repeat);
     void stop(uint8_t source);
     void finnish(uint8_t source);
@@ -43,6 +45,7 @@ class edgeAction
     bool getRepeat() {return repeat;};
     void loadConfig(fs::FS &fs, uint8_t number);
     void saveConfig(fs::FS &fs, uint8_t number);
+    void setActionInitFunction(void (*fp)(uint8_t number));
     void setActionPlayFunction(int (*fp)(uint8_t number));
     void setActionStopFunction(int (*fp)(uint8_t number));
     int userState; // this variable can be used by the user defined play and stop functions to keep track of the state
@@ -56,6 +59,7 @@ class edgeAction
     bool repeat;
     int (*fpPlay)(uint8_t number) = nullptr;
     int (*fpStop)(uint8_t number) = nullptr;
+    void (*fpInit)(uint8_t number) = nullptr;
 
 };
 
@@ -63,6 +67,7 @@ void actionHelperTask(void * pvParameters);
 
 int defaultPlayFcn(uint8_t number);
 int defaultStopFcn(uint8_t number);
+void defaultInitFcn(uint8_t number);
 
 extern edgeAction action[];
 

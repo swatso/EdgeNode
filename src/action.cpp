@@ -81,13 +81,14 @@ void actionHelperTask(void * pvParameters)
 
 edgeAction::edgeAction()
 {
-  state = ACTION_STOPPED;
+  state = ACTION_INIT;
   demandedState = DEMAND_STOP;
   enableLocal = true;
   enableRemote = true;
-  userState = 1;
+  userState = 0;
   userVar1 = 0;
   userVar2 = 0;
+  setActionInitFunction(defaultInitFcn);
   setActionPlayFunction(defaultPlayFcn);
   setActionStopFunction(defaultStopFcn);
 }
@@ -156,6 +157,19 @@ void edgeAction::setActionStopFunction(int (*fp)(uint8_t number))
   fpStop = fp;
 }
 
+void edgeAction::setActionInitFunction(void (*fp)(uint8_t number))
+{
+  fpInit = fp;
+}
+
+
+void defaultInitFcn(uint8_t number)
+{
+  action[number].userState = 1;
+  action[number].userVar1 = 0;
+  action[number].userVar2 = 0;
+}
+
 int defaultPlayFcn(uint8_t number)
 {
   //Serial.print("defaultPlayFunction for action:"); Serial.println(number);
@@ -197,6 +211,11 @@ void edgeAction::helper()
   {
     switch(state)
     {
+      case ACTION_INIT:
+        fpInit(number);       // call the user defined init function to execute the initialization behavior
+        state = ACTION_STOPPED;
+        break;
+
       case ACTION_STOPPED:
         if(demandedState == DEMAND_PLAY)state = ACTION_PLAYING;
         else

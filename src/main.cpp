@@ -31,10 +31,11 @@ void setup()
   setupGPIO();
   setupUserCode();
   mp3.loadConfig();
-  //setupAction();
-  //loadActionConfig();
+  setupAction();
+  loadActionConfig();
   loadServoPositions();
   setupSound();
+  initUserCode();
   powerGPIO(true);
 
 Serial.print("Core:");

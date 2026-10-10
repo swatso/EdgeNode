@@ -192,10 +192,10 @@ void readMP3ConfigFile(fs::FS &fs)
     xSemaphoreGive(fsLock);
     return;
   }
-  mp3.currentTrack = std::stoi(readConfigItem(file),NULL,10);
-  mp3.currentVolume = std::stoi(readConfigItem(file),NULL,10);
-  mp3.manualTrim = std::stoi(readConfigItem(file),NULL,10);
-  mp3.autoTrim = std::stoi(readConfigItem(file),NULL,10);
+  mp3.currentTrack = (int)strtol(readConfigItem(file),NULL,10);
+  mp3.currentVolume = (int)strtol(readConfigItem(file),NULL,10);
+  mp3.manualTrim = (int)strtol(readConfigItem(file),NULL,10);
+  mp3.autoTrim = (int)strtol(readConfigItem(file),NULL,10);
   xSemaphoreGive(fsLock);
   file.close();
 }
@@ -271,14 +271,14 @@ void readMP3TrackConfigFile(fs::FS &fs, uint8_t trackNo)
     return;
   }
   char buffer[20];
-  int l = file.readBytesUntil('\n',buffer,sizeof(buffer));
-  buffer[l-1]='\0';
+  int l = file.readBytesUntil('\n',buffer,sizeof(buffer)-1);
+  buffer[(l>0)?l-1:0]='\0';
   for(i=0; (buffer[i] != '\0')&& (i<19); i++)mp3.track[trackNo].name[i] = buffer[i];
   mp3.track[trackNo].name[i]='\0';
-  mp3.track[trackNo].volume = std::stoi(readConfigItem(file),NULL,10);
-  mp3.track[trackNo].duration = std::stoi(readConfigItem(file),NULL,10);
-  mp3.track[trackNo].enableLocal = std::stoi(readConfigItem(file),NULL,10);
-  mp3.track[trackNo].enableRemote = std::stoi(readConfigItem(file),NULL,10);
+  mp3.track[trackNo].volume = (int)strtol(readConfigItem(file),NULL,10);
+  mp3.track[trackNo].duration = (int)strtol(readConfigItem(file),NULL,10);
+  mp3.track[trackNo].enableLocal = (int)strtol(readConfigItem(file),NULL,10);
+  mp3.track[trackNo].enableRemote = (int)strtol(readConfigItem(file),NULL,10);
 
   //Serial.print("name: ");
   //Serial.println(mp3.track[trackNo].name);
@@ -366,7 +366,7 @@ int readServoPosition(fs::FS &fs, uint8_t bitNo)
     return(-1);
   }
 //Serial.println("File found");
-  int position = std::stoi(readConfigItem(file),NULL,10);
+  int position = (int)strtol(readConfigItem(file),NULL,10);
 //  char buffer[20];
 //  int l = file.readBytesUntil('\n',buffer,sizeof(buffer));
 //  buffer[l-1]='\0';
@@ -454,9 +454,9 @@ void readActionConfigFile(fs::FS &fs, uint8_t number)
   buffer[strlen(buffer)-1]='\0';
   for(i=0; (buffer[i] != '\0')&& (i<19); i++)action[number].name[i] = buffer[i];
   action[number].name[i]='\0';
-  action[number].number = std::stoi(readConfigItem(file),NULL,10);
-  action[number].enableLocal = std::stoi(readConfigItem(file),NULL,10);
-  action[number].enableRemote = std::stoi(readConfigItem(file),NULL,10);
+  action[number].number = (int)strtol(readConfigItem(file),NULL,10);
+  action[number].enableLocal = (int)strtol(readConfigItem(file),NULL,10);
+  action[number].enableRemote = (int)strtol(readConfigItem(file),NULL,10);
 
   //Serial.print("number: ");
   //Serial.println(action[number].number);
@@ -533,7 +533,7 @@ char* readConfigItem(File file)
   //Serial.println(buffer[1]);
   //Serial.println(buffer[2]);
 
-  buffer[l-1]='\0';
+  if(l>0) buffer[l-1]='\0'; else buffer[0]='\0';
   //Serial.printf("char0:%d ",buffer[0]);
   //Serial.printf("char1:%d ",buffer[1]);
   //Serial.printf("char2:%d ",buffer[2]);
@@ -577,8 +577,8 @@ void readConfigFile(fs::FS &fs, uint8_t bit)
     return;
   }
   char buffer[20];
-  int l = file.readBytesUntil('\n',buffer,sizeof(buffer));
-  buffer[l-1]='\0';
+  int l = file.readBytesUntil('\n',buffer,sizeof(buffer)-1);
+  buffer[(l>0)?l-1:0]='\0';
   for(i=0; (buffer[i] != '\0')&& (i<19); i++)gpio[bit].name[i] = buffer[i];
   gpio[bit].name[i]='\0';
 
@@ -588,22 +588,22 @@ void readConfigFile(fs::FS &fs, uint8_t bit)
   //Serial.print(" Type=");
   //Serial.println(xx);
 
-  gpio[bit].setType((std::stoi(xx,NULL,10)));
+  gpio[bit].setType(((int)strtol(xx,NULL,10)));
 
 
 //  gpio[bit].setType((int)(readConfigItem(file)));
 
   //Serial.println("c");
-  gpio[bit].preset0 = std::stoi(readConfigItem(file),NULL,10);
-  gpio[bit].preset1 = std::stoi(readConfigItem(file),NULL,10);
-  gpio[bit].preset2 = std::stoi(readConfigItem(file),NULL,10);
-  gpio[bit].rate = std::stoi(readConfigItem(file),NULL,10);
-  gpio[bit].setEasingType(std::stoi(readConfigItem(file),NULL,10));
-  gpio[bit].enableRemote = std::stoi(readConfigItem(file),NULL,10);
+  gpio[bit].preset0 = (int)strtol(readConfigItem(file),NULL,10);
+  gpio[bit].preset1 = (int)strtol(readConfigItem(file),NULL,10);
+  gpio[bit].preset2 = (int)strtol(readConfigItem(file),NULL,10);
+  gpio[bit].rate = (int)strtol(readConfigItem(file),NULL,10);
+  gpio[bit].setEasingType((int)strtol(readConfigItem(file),NULL,10));
+  gpio[bit].enableRemote = (int)strtol(readConfigItem(file),NULL,10);
   //Serial.print("readCOnfigFile enableRemote: ");
   //Serial.println(gpio[bit].enableRemote);
-  gpio[bit].enableLocal = std::stoi(readConfigItem(file),NULL,10);
-  gpio[bit].setPublishRate(std::stoi(readConfigItem(file),NULL,10));
+  gpio[bit].enableLocal = (int)strtol(readConfigItem(file),NULL,10);
+  gpio[bit].setPublishRate((int)strtol(readConfigItem(file),NULL,10));
   file.close();
   xSemaphoreGive(fsLock);
   //Serial.println("Done");

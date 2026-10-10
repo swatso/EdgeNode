@@ -24,10 +24,45 @@
 #include "action.h"
 #include "sound.h"
 #include "GCodeControl.h"
+#include "CraneWinch.h"
+
+#define CRANE_MAX_DELAY 2000  // Maximum delay for crane rotation in milliseconds
+#define CRANE_SLOW 128
+#define CRANE_STOP 0
+#define CRANE_CLOCKWISE 0
+#define CRANE_ANTICLOCKWISE 1
+#define CRANE_ROTATION_TIME 60000  // Time for crane rotation in milliseconds (60 seconds)
+#define CEMENT_LORRY_BARREL_STOP 0
+#define CEMENT_LORRY_BARREL_SLOW 200
+#define CEMENT_LORRY_BARREL_FAST 255
+#define LIGHTS_BRIGHT 64           // Cement Lorry four way flashers
+#define LIGHTS_DIM 0
+CraneStatus status;
+
+// Setup the I2C interface for the CraneWinch module
+TwoWire& wire = Wire;
+uint8_t craneWinchAddress = 0x40; // replace with the actual I2C address of the CraneWinch module
+uint8_t commandRegister = 0x01; // replace with the actual command register address
+uint8_t statusRegister = 0x02; // replace with the actual status register address
+CraneWinch craneWinch(wire, craneWinchAddress, commandRegister, statusRegister);
 
 void setupUserCode() 
 {
-    // User code setup
+  if (!wire.begin(23,22))
+  {
+    Serial.println("Failed to initialize I2C for CraneWinch");
+  }
+  else
+  {
+    Serial.println("I2C for CraneWinch initialized successfully");
+  }
+
+  // Override the default target pulse counts for the crane winch
+  craneWinch.writeTargetPulseCount(1, 10);
+  craneWinch.writeTargetPulseCount(2, 42);
+  craneWinch.writeTargetPulseCount(3, 61);
+
+  // User code setup
     // This function is called during setup() in main.cpp and can be used to perform any user defined setup required for the action sequences, such as configuring GPIOs, initializing sensors, etc.
     // For example, to set the play and stop functions for Action 0 to the template functions defined below:
 
@@ -36,97 +71,81 @@ void setupUserCode()
 
     gpio[0].setType(GPIO_PWM);          // Crane rotation speed demand
     strcpy(gpio[0].name, "Crane rotation spd");
+    gpio[0].preset1 = CRANE_STOP;
+    gpio[0].preset2 = CRANE_SLOW;
+
     gpio[1].setType(GPIO_DIGOUT);       // Crane rotation direction
     strcpy(gpio[1].name, "Crane rotation dir");
-    gpio[2].setType(GPIO_DIGIN);        // Crane hoist limit switch0 (Hall sensor)
-    strcpy(gpio[2].name, "Hoist limit sw0");
-    gpio[3].setType(GPIO_DIGIN);        // Crane hoist limit switch1 (Hall sensor)
-    strcpy(gpio[3].name, "Hoist limit sw1");
-    gpio[4].setType(GPIO_SERVO);        // Crane hoist control
-    strcpy(gpio[4].name, "Crane hoist ctrl");
-    gpio[5].setType(GPIO_PWM);          // Crane lights
-    strcpy(gpio[5].name, "Crane lights");
+
+    gpio[4].setType(GPIO_PWM);       // Cement Lorry Barrel
+    strcpy(gpio[4].name, "Cement Lorry Barrel");
+    gpio[4].localWrite(false);
+    gpio[4].preset1 = CEMENT_LORRY_BARREL_STOP;
+    gpio[4].preset2 = CEMENT_LORRY_BARREL_SLOW;
+
+    gpio[5].setType(GPIO_PWM_PULSE);          // Crane lights
+    strcpy(gpio[5].name, "4 way flashers");
+    gpio[5].preset1 = LIGHTS_BRIGHT;
+    gpio[5].preset2 = LIGHTS_DIM;
+    gpio[5].rate = 2000;                  // cycle period in mS for the PWM pulse
+    gpio[5].preset0 = 1000;                // Bright (strobe) period in mS
+
     gpio[6].setType(GPIO_PWM);          // Building Feature Lights
     strcpy(gpio[6].name, "Building Lights");
+    gpio[6].preset1 = LIGHTS_DIM;
+    gpio[6].localWrite(true);             // ALways flashing
 
     // hardcode sound configuration here
     strcpy(mp3.track[0].name, "Ambient");
-    mp3.track[0].duration = 50000;        // duration of track 0 in mS
-    mp3.track[0].volume = 10;            // volume for track 0 (0 to 30)
+    mp3.track[0].duration = 330000;        // duration of track 0 in mS
+    mp3.track[0].volume = 30;            // volume for track 0 (0 to 30)
 
-    strcpy(mp3.track[1].name, "Ambient");
-    mp3.track[1].duration = 78000;    // duration of track 1 in mS - Ambient
-    mp3.track[1].volume = 5;        // volume for track 1 (0 to 30)
+    strcpy(mp3.track[1].name, "CementLorry");
+    mp3.track[1].duration = 82000;    // duration of track 1 in mS
+    mp3.track[1].volume = 20;        // volume for track 1 (0 to 30)
 
-    strcpy(mp3.track[2].name, "Ambient2");
-    mp3.track[2].duration = 77000;    // duration of track 2 in mS - Ambient
+    strcpy(mp3.track[2].name, "none");
+    mp3.track[2].duration = 0;    // duration of track 2 in mS
     mp3.track[2].volume = 3;        // volume for track 2 (0 to 30)
 
-    strcpy(mp3.track[3].name, "Children Playing");
-    mp3.track[3].duration = 72000;    // duration of track 3 in mS - Children playing
+    strcpy(mp3.track[3].name, "none");
+    mp3.track[3].duration = 0;    // duration of track 3 in mS
     mp3.track[3].volume = 10;        // volume for track 3 (0 to 30)
 
-    strcpy(mp3.track[4].name, "Siren");
-    mp3.track[4].duration = 4000;    // duration of track 4 in mS - Siren
-    mp3.track[4].volume = 10;        // volume for track 4 (0 to 30)
-
-    strcpy(mp3.track[5].name, "Train Bell");
-    mp3.track[5].duration = 9000;    // duration of track 5 in mS - Train Bell
-    mp3.track[5].volume = 10;        // volume for track 5 (0 to 30)
-
-    strcpy(mp3.track[6].name, "Siren Low");
-    mp3.track[6].duration = 19000;    // duration of track 6 in mS - Siren Low
-    mp3.track[6].volume = 10;        // volume for track 6 (0 to 30)
-    strcpy(mp3.track[7].name, "Whistle");
-    mp3.track[7].duration = 1000;    // duration of track 7 in mS - Whistle
-    mp3.track[7].volume = 10;        // volume for track 7 (0 to 30)
-
-    strcpy(mp3.track[8].name, "Whistle Long");
-    mp3.track[8].duration = 3000;    // duration of track 8 in mS  - Whistle
-    mp3.track[8].volume = 10;        // volume for track 8 (0 to 30)
-    
-    strcpy(mp3.track[9].name, "Horn Short");
-    mp3.track[9].duration = 1000;    // duration of track 9 in mS - Horn
-    mp3.track[9].volume = 10;        // volume for track 9 (0 to 30)
-    // ...  
-
-
-
-
     // define an example action with the template play and stop functions defined below. You can define up to 16 actions (numbered 0-15) with their own play and stop functions.
-    strcpy(action[0].name, "Template Action");
-    action[0].setActionPlayFunction(templatePlayFcn);
-    action[0].setActionStopFunction(templateStopFcn);
+    strcpy(action[0].name, "Crane Automation");
+    action[0].setActionPlayFunction(action0PlayFcn);
+    action[0].setActionStopFunction(action0StopFcn);
 
-    strcpy(action[1].name, "GCode Home Command");
+    strcpy(action[1].name, "Crane Clockwise");
     action[1].setActionPlayFunction(action1PlayFcn);
     action[1].setActionStopFunction(action1StopFcn);
 
-    strcpy(action[2].name, "path14.0");
+    strcpy(action[2].name, "Crane AntiClockwise");
     action[2].setActionPlayFunction(action2PlayFcn);
     action[2].setActionStopFunction(action2StopFcn);
 
-    strcpy(action[3].name, "path14.1");
+    strcpy(action[3].name, "Winch P1");
     action[3].setActionPlayFunction(action3PlayFcn);
     action[3].setActionStopFunction(action3StopFcn);
 
-    strcpy(action[4].name, "path15.0");
+    strcpy(action[4].name, "Winch P2");
     action[4].setActionPlayFunction(action4PlayFcn);
     action[4].setActionStopFunction(action4StopFcn);
 
-    strcpy(action[5].name, "path15.1");
+    strcpy(action[5].name, "Winch P3");
     action[5].setActionPlayFunction(action5PlayFcn);
     action[5].setActionStopFunction(action5StopFcn);
 
-    strcpy(action[6].name, "GCode Load Object");
+    strcpy(action[6].name, "Cement Lorry On");
     action[6].setActionPlayFunction(action6PlayFcn);
     action[6].setActionStopFunction(action6StopFcn);
 
-    strcpy(action[7].name, "play Scene1");
+    strcpy(action[7].name, "Cement Lorry Off");
     action[7].setActionPlayFunction(action7PlayFcn);
     action[7].setActionStopFunction(action7StopFcn);
 
-    strcpy(action[8].name, "play SD file");
+    strcpy(action[8].name, "Lorry Flashers");
     action[8].setActionPlayFunction(action8PlayFcn);
     action[8].setActionStopFunction(action8StopFcn);
 
@@ -134,7 +153,17 @@ void setupUserCode()
     strcpy(action[15].name, "RUN1 switch Action");
     action[15].setActionPlayFunction(runSwitchHandler);
     action[15].play(CMD_LOCAL, true); // start the action to monitor the RUN1 switch (this will call the runSwitchHandler function every 500 mS to check the state of the switch and start/stop the action sequence for action 0 accordingly)
+
     localDebug.println("User code setup completed");
+}
+
+
+void initUserCode()
+{
+  // initialise outputs just prior to turning on power to the output subsystem
+  // this is important if you want to over-ride the saved value of a servo at powerup for example
+
+    mp3.play(CMD_LOCAL,0, true);          // play ambient sounds
 }
 
 int runSwitchHandler(uint8_t number)
@@ -186,8 +215,8 @@ int templatePlayFcn(uint8_t number)
       localOperations.println("Executing action sequence for action number: " + String(number));
       localDebug.println("Step 1 of action sequence for action number: " + String(number));
       // Set userState to the next state and return the required delay time in milliseconds before the next step is executed
-      gpio[0].rate = 1000;     // change the pulse cycle to 1000 mS (applies to GPIO_PWM_PULSE)
-      gpio[0].localWrite(true); 
+      //gpio[0].rate = 1000;     // change the pulse cycle to 1000 mS (applies to GPIO_PWM_PULSE)
+      //gpio[0].localWrite(true); 
       action[number].userState = 2;
       return(10000); // wait for 10 seconds before executing the next step
 
@@ -203,7 +232,6 @@ int templatePlayFcn(uint8_t number)
     case 3:
       // Perform the third step of the action sequence
       localOperations.println("Step 3 of action sequence for action number: " + String(number));
-      // Set userState to 0 to indicate that the sequence is completed and return 0 to indicate that no further steps are required
       gpio[0].localWrite(false);
       return(0); // no further steps required
 
@@ -226,7 +254,164 @@ int templateStopFcn(uint8_t number)
   //action configuration page in the web interface for debugging purposes.
   localOperations.println("Stopping action sequence for action number: " + String(number));
   gpio[0].localWrite(false);
-  action[number].stop(CMD_LOCAL);
+  return(0);
+}
+
+int action0PlayFcn(uint8_t number)
+{
+  // Note: Crane rotation Limit switches are active LOW
+  //  This is the main crane automated control action
+  // It busies the crane moving a concrete load between two locations
+  // With random delays between actions to simulate realistic operation
+  switch(action[number].userState)
+  {
+    case 1:
+    // Rotation Position unknown and raise winch to Position 1
+    gpio[0].localWrite(CRANE_STOP);              // Make sure that rotation is stopped
+    craneWinch.sendCommand(CraneCommand::MoveToPosition1);
+    if(craneWinch.readStatus(status) && status == CraneStatus::Position1)
+    {
+      // Ok, the load is raised to a safe height to rotate the crane
+      gpio[1].localWrite(CRANE_ANTICLOCKWISE);        // Crane rotation direction
+      gpio[0].localWrite(CRANE_SLOW);                 // Crane rotation speed demand
+      action[number].userState = 2;
+      return(CRANE_ROTATION_TIME);
+    }
+    return(5000);         // delay whilst the winch operates
+    break;
+
+    case 2:
+    // Rotated AntiClockwise and Lowering Hoist down    
+    gpio[0].localWrite(CRANE_STOP);               // Make sure that rotation is stopped
+    craneWinch.sendCommand(CraneCommand::MoveToPosition2);
+    if(craneWinch.readStatus(status) && status == CraneStatus::Position2)
+    {
+      action[number].userState = 4;               // limit switch 0 is activated
+    }
+    return(100);
+    break;
+
+    case 3:
+    return(1000);
+    break;
+
+    case 4:
+    // Rotated Anticlockwise and Hoist is down
+    gpio[0].localWrite(CRANE_STOP);               // Make sure that rotation is stopped
+    action[number].userState = 6;
+    return(random(1000, CRANE_MAX_DELAY));
+    break;
+
+    case 5:
+    break;
+
+    case 6:
+    // Rotated Anticlockwise and Hoist travelling up
+    gpio[0].localWrite(CRANE_STOP);               // Make sure that rotation is stopped
+    craneWinch.sendCommand(CraneCommand::MoveToPosition1);      // transit position
+    if(craneWinch.readStatus(status) && status == CraneStatus::Position1)
+    {
+      action[number].userState = 7;
+    }
+    return(100);
+    break;
+
+    case 7:
+    // Rotated Anticlockwise and Hoist has reached the transit position (1)
+    gpio[0].localWrite(CRANE_STOP);               // Make sure that rotation is stopped
+    action[number].userState = 8;
+    return(random(1000, CRANE_MAX_DELAY));
+    break;
+
+    case 8:
+    // rotate clockwise
+    gpio[1].localWrite(CRANE_CLOCKWISE);        // Crane rotation direction
+    gpio[0].localWrite(CRANE_SLOW);              // Crane rotation speed demand
+    action[number].userState = 9;
+    mp3.stop(CMD_LOCAL);
+    mp3.play(CMD_LOCAL,1, true);          // play lorry sound
+    gpio[5].localWrite(true);             // turn on 4 way flashers
+    gpio[4].localWrite(true);             // Turn on Cement Lorry barrel at slow speed
+    return(CRANE_ROTATION_TIME);
+    break;
+
+    case 9:
+    // Rotated clockwise and Hoist is in transit position
+    gpio[0].localWrite(CRANE_STOP);              // Crane rotation speed demand
+    action[number].userState = 10;
+
+    // turn on the cement lorry barrel and 4 way flashers
+
+    gpio[4].localWrite(true);
+    gpio[5].localWrite(true);
+    return(1000);
+    break;
+
+    case 10:
+    // Rotated clockwise and hoist moving downwards
+    gpio[4].localWrite(true);
+    gpio[0].localWrite(CRANE_STOP);               // Make sure that rotation is stopped
+    craneWinch.sendCommand(CraneCommand::MoveToPosition3);
+    if(craneWinch.readStatus(status) && status == CraneStatus::Position3)
+    {
+      action[number].userState = 12;            
+    }
+    return(100);
+    break;
+
+    case 11:
+    break;
+
+    case 12:
+    // Rotated clockwise and Hoist is down
+    gpio[0].localWrite(CRANE_STOP);              // Make sure that rotation is stopped
+    action[number].userState = 14;
+    return(random(1000, CRANE_MAX_DELAY));
+    break;
+
+    case 13:
+    break;
+
+    case 14:
+    // Rotated clockwise and Hoist moving upwards to transit position (1)
+    gpio[0].localWrite(CRANE_STOP);               // Make sure that rotation is stopped
+    craneWinch.sendCommand(CraneCommand::MoveToPosition1);      // transit position
+    if(craneWinch.readStatus(status) && status == CraneStatus::Position1)
+    {
+      action[number].userState = 15;
+    }
+    return(100);
+    break;
+
+    case 15:
+    // Rotated clockwise and Hoist has reached the transit position
+    gpio[4].localWrite(false);                    // stop the cement lorry barrel
+    gpio[5].localWrite(false);                    // turn off 4 way flashers
+    gpio[0].localWrite(CRANE_STOP);               // Make sure that rotation is stopped
+    mp3.stop(CMD_LOCAL);
+    mp3.play(CMD_LOCAL,0, true);                  // play ambient sound
+    action[number].userState = 16;
+    return(random(1000, CRANE_MAX_DELAY));
+    break;
+
+    case 16:
+    // rotate anticlockwise
+    gpio[1].localWrite(CRANE_ANTICLOCKWISE);        // Crane rotation direction
+    gpio[0].localWrite(CRANE_SLOW);                 // Crane rotation speed demand
+    action[number].userState = 2;
+    return(random(CRANE_ROTATION_TIME, CRANE_MAX_DELAY));
+    break;
+  }
+  return(0);
+}
+
+int action0StopFcn(uint8_t number)
+{
+  gpio[4].localWrite(false);                    // stop the cement lorry barrel
+  gpio[5].localWrite(false);                    // turn off 4 way flashers
+  gpio[0].localWrite(CRANE_STOP);               // Make sure that rotation is stopped
+  mp3.stop(CMD_LOCAL);
+  mp3.play(CMD_LOCAL,0 , true);      // play ambient sound
   return(0);
 }
 
@@ -234,50 +419,106 @@ int templateStopFcn(uint8_t number)
 int action1PlayFcn(uint8_t number)
 {
   Serial.println("action1PlayFcn: " + String(number));
+  Serial.println("Rotate Crane Clockwise");
+  switch(action[number].userState)
+  {
+    case 1:
+    gpio[1].localWrite(CRANE_CLOCKWISE);        // Crane rotation direction
+    gpio[0].localWrite(true); 
+    action[number].userState = 2;
+    return(50000);
+    break;
+
+    case 2:
+    gpio[0].localWrite(false); 
+    action[number].stop(CMD_LOCAL);             // Stop the action locally
+    return(0);
+    break;
+  }
   return(0);
 }
 
 int action1StopFcn(uint8_t number)
 {
-  action[number].stop(CMD_LOCAL);
+  gpio[0].localWrite(false);
   return(0);
 }
 
 int action2PlayFcn(uint8_t number)
 {
+   Serial.println("action2PlayFcn: " + String(number));
+  Serial.println("Rotate Crane Anticlockwise");
+  switch(action[number].userState)
+  {
+    case 1:
+    gpio[1].localWrite(CRANE_ANTICLOCKWISE);        // Crane rotation direction
+    gpio[0].localWrite(true);              // Crane rotation speed demand
+    action[number].userState = 2;
+    return(50000);
+    break;
+
+    case 2:
+    gpio[0].localWrite(false);          // Crane rotation speed demand
+    action[number].stop(CMD_LOCAL);     // Go straight  to Stop State
+    return(0);
+    break;
+  }
   return(0);
 }
 
 int action2StopFcn(uint8_t number)
 {
-  action[number].stop(CMD_LOCAL);
+  gpio[0].localWrite(false);          // Crane rotation speed demand
   return(0);
 }
 
 int action3PlayFcn(uint8_t number)
-{
+{  
+  // Crane Winch Control for Moving to Position 1
+  switch(action[number].userState)
+  {
+    case 1:
+    craneWinch.sendCommand(CraneCommand::MoveToPosition1);
+    action[number].userState = 2;
+    return(100);
+    break;
+
+    case 2:
+    Serial.println("Result of readStatus: " + String(craneWinch.readStatus(status)));
+
+    if(craneWinch.readStatus(status) && status == CraneStatus::Position1) {
+      Serial.println("Crane has reached Position 1");
+      action[number].stop(CMD_LOCAL);     // Go straight  to Stop State
+      return(0);
+    }
+    return(100);
+  }
   return(0);
 }
 
 int action3StopFcn(uint8_t number)
 {
-  action[number].stop(CMD_LOCAL);
   return(0);
 }
 
 int action4PlayFcn(uint8_t number)
 {
+  // Move Crane Winch to Position 2
+  craneWinch.sendCommand(CraneCommand::MoveToPosition2);
+  action[number].stop(CMD_LOCAL);     // Go straight  to Stop State
   return(0);
 }
 
 int action4StopFcn(uint8_t number)
 {
-  action[number].stop(CMD_LOCAL);
   return(0);
 }
 
 int action5PlayFcn(uint8_t number)
 {
+  // Move Crane Winch to Position 3
+  craneWinch.sendCommand(CraneCommand::MoveToPosition3);
+  action[number].stop(CMD_LOCAL);     // Go straight  to Stop State
   return(0);
 }
 
@@ -291,17 +532,34 @@ int action5StopFcn(uint8_t number)
 
 int action6PlayFcn(uint8_t number)
 {
+  Serial.println("action6PlayFcn: " + String(number));
+  Serial.println("Cement Lorry On");
+  gpio[4].localWrite(true);  // Turn on Cement Lorry barrel at slow speed
+  gpio[5].localWrite(true);  // Turn on 4 way flashers
+  mp3.stop(CMD_LOCAL);
+  mp3.play(CMD_LOCAL,1, true);      // play lorry sound
+  action[number].stop(CMD_LOCAL);     // Go straight  to Stop State
   return(0);
 }
 
 int action6StopFcn(uint8_t number)
 {
   action[number].stop(CMD_LOCAL);
+  gpio[5].localWrite(false);  // Turn off 4 way flashers
+  mp3.stop(CMD_LOCAL);
+  mp3.play(CMD_LOCAL,0 , true);      // play ambient sound
   return(0);
 }
 
 int action7PlayFcn(uint8_t number)
 {
+  Serial.println("action7PlayFcn: " + String(number));
+  Serial.println("Cement Lorry Off");
+  gpio[4].localWrite(false);  // Turn off Cement Lorry barrel
+  mp3.stop(CMD_LOCAL);
+  mp3.play(CMD_LOCAL,0, true);  // Resume ambient sounds
+  action[number].stop(CMD_LOCAL);     // Go straight  to Stop State
+  return(0);
 }
 
 int action7StopFcn(uint8_t number)

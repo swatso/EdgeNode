@@ -6,6 +6,10 @@
 #include "GCodeControl.h"
 
 void setupUserCode();
+void initUserCode();
+void action0InitFcn(uint8_t number);
+int action0PlayFcn(uint8_t number);
+int action0StopFcn(uint8_t number);
 int action1PlayFcn(uint8_t number);
 int action1StopFcn(uint8_t number);
 int action2PlayFcn(uint8_t number);

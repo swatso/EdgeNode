@@ -1,0 +1,33 @@
+Crane Winch Control
+===================
+
+Winch control is performed by a separate dedicated Arduino Pro Mini MCU and associated VStudio PlatformIO project (see Documents/GitRepos/CraneControl) which acts as an I2C bus slave and has a simple command and status register interface to this node.
+
+In this document we will cover the architecture, command and status register interface, and usage of the crane winch control system.
+
+Architecture
+The crane winch control system consists of an Arduino Pro Mini MCU that interfaces with the main control node via the I2C bus. The MCU is responsible for controlling the winch motor, reading sensors, and maintaining the status registers. The main control node sends commands to the winch control MCU and reads its status registers to monitor and control the winch operation.
+
+Command and Status Register Interface
+The winch control MCU exposes a command and status register over the I2C bus. The main control node can write to the command register to issue control commands:-
+
+enum class CraneCommand : uint8_t {
+    DisableAllMovement = 0x00,
+    LowerToPosition1 = 0x01,
+    LowerToPosition2 = 0x02,
+    RaiseToUpperLimit = 0x03
+};
+
+enum class CraneStatus : uint8_t {
+    DisableAllMovement = 0x00,
+    Position1 = 0x01,
+    Position2 = 0x02,
+    UpperLimit = 0x03,
+    NotInitialised = 0x04,
+    ErrorCondition = 0x05
+};
+
+Usage
+The new Winch Control Module should create a winchControl object and an I2C master which allows operation of the Winch via the I2C interface.
+
+The object will be used within the UserCode module which will defines action sequences to control all aspects of the crane.
