@@ -1,3 +1,12 @@
+# Node 28 - Building Site Diorama CNC interface Manager
+
+This project provides a web-configurable interface for managing a building site diorama CNC setup using an ESP32-based EdgeNode. Specifically, it controls 
+- the Marlin Based CNC controller via a serial connection.
+- Forklift Pallet control capture and release via digital I/O.
+- Specific animation soundtracks via the inbuilt MP3 player.
+- Web-based configuration and control interface.
+- MQTT integration for remote control and monitoring.
+- 
 # EdgeNode
 
 IO and Edge Compute Node with Web Configuration and MQTT interface (eg to JMRI)

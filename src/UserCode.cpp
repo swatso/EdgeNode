@@ -34,20 +34,14 @@ void setupUserCode()
     // hardcode GPIO types here
     //initGCodeControl();     // GCode Control is not part of the Victoria Centre controller
 
-    gpio[0].setType(GPIO_PWM);          // Crane rotation speed demand
-    strcpy(gpio[0].name, "Crane rotation spd");
-    gpio[1].setType(GPIO_DIGOUT);       // Crane rotation direction
-    strcpy(gpio[1].name, "Crane rotation dir");
-    gpio[2].setType(GPIO_DIGIN);        // Crane hoist limit switch0 (Hall sensor)
-    strcpy(gpio[2].name, "Hoist limit sw0");
-    gpio[3].setType(GPIO_DIGIN);        // Crane hoist limit switch1 (Hall sensor)
-    strcpy(gpio[3].name, "Hoist limit sw1");
-    gpio[4].setType(GPIO_SERVO);        // Crane hoist control
-    strcpy(gpio[4].name, "Crane hoist ctrl");
-    gpio[5].setType(GPIO_PWM);          // Crane lights
-    strcpy(gpio[5].name, "Crane lights");
-    gpio[6].setType(GPIO_PWM);          // Building Feature Lights
-    strcpy(gpio[6].name, "Building Lights");
+    gpio[0].setType(GPIO_DIGIN);          // Lorry Pallet Present Indicator (active low)
+    strcpy(gpio[0].name, "Lorry Pallet");
+    gpio[1].setType(GPIO_DIGOUT);       // Lorry Pallet Lock
+    strcpy(gpio[1].name, "Lorry Pallet Lock");
+    gpio[2].setType(GPIO_DIGIN);        // Yard Pallet Present Indicator (active low)
+    strcpy(gpio[2].name, "Yard Pallet");
+    gpio[3].setType(GPIO_DIGIN);        // Yard Pallet Lock
+    strcpy(gpio[3].name, "Yard Pallet Lock");
 
     // hardcode sound configuration here
     strcpy(mp3.track[0].name, "Ambient");
