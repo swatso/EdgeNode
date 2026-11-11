@@ -25,5 +25,15 @@ int action8StopFcn(uint8_t number);
 int templatePlayFcn(uint8_t number);
 int templateStopFcn(uint8_t number);
 int runSwitchHandler(uint8_t number);
+bool scene2RunFcn(uint8_t number);
+bool scene3RunFcn(uint8_t number);
+bool scene8RunFcn(uint8_t number);
+
+void scene2CompletionHandler(uint8_t sceneIndex, bool success);
+void scene3CompletionHandler(uint8_t sceneIndex, bool success);
+void scene4CompletionHandler(uint8_t sceneIndex, bool success);
+void scene5CompletionHandler(uint8_t sceneIndex, bool success);
+void scene6CompletionHandler(uint8_t sceneIndex, bool success);
+void scene7CompletionHandler(uint8_t sceneIndex, bool success);
 
 #endif // USERCODE_H

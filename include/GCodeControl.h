@@ -74,16 +74,29 @@ extern Pose currentPose;
 extern void loadGCodeObject(int index);
 void setSpeed(int speed);
 
+// User-defined scene handler (see UserCode). Receives the scene index; returns true on success.
+typedef bool (*SceneRunFunction)(uint8_t number);
+
 class Scene
 {
 public:
-  char name[20];  // friendly name for this scene
+  char name[31];  // friendly name for this scene (up to 30 bytes)
   uint8_t sound;  // index of the sound to play when this scene runs
   char path[64];  // SD path (folder) associated with this scene, e.g. "SCN_0"
+  uint8_t index;  // position of this scene in scenes[], passed to the run function
+  SceneRunFunction runFunction; // optional user function executed by run()
 
-  Scene() : sound(0) {
+  Scene() : sound(0), index(0), runFunction(nullptr) {
     name[0] = '\0';
     path[0] = '\0';
+  }
+
+  void setIndex(uint8_t newIndex) {
+    index = newIndex;
+  }
+
+  void setRunFunction(SceneRunFunction fn) {
+    runFunction = fn;
   }
 
   void setName(const char* newName) {
@@ -100,8 +113,11 @@ public:
     path[sizeof(path) - 1] = '\0';
   }
 
-  // TODO: flesh out full scene execution logic; for now just kick off the SD path run.
+  // Calls the user-defined function if one is registered, otherwise falls back to the SD path run.
   bool run() {
+    if (runFunction) {
+      return runFunction(index);
+    }
     return runSDPath(path);
   }
 };

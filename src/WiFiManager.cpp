@@ -13,6 +13,7 @@
 #include "sound.h"
 #include "action.h"
 #include "GCodeControl.h"
+#include "SceneCallbacks.h"
 
 #include <Arduino.h>                              		
 #include <WiFi.h>                                 		
@@ -159,10 +160,14 @@ void sceneRunTask(void*)
       Serial.print("run scene: ");
       Serial.println(request.index);
 
-      if (!runScene(request.index))
+      bool success = runScene(request.index);
+      if (!success)
       {
         Serial.println("runScene failed");
       }
+
+      // Invoke any registered callbacks for this scene
+      sceneCallbacks.invokeCallbacks(request.index, success);
     }
   }
 }

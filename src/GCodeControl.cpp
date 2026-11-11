@@ -42,16 +42,11 @@ int currentSpeedPercent = 100; // Default speed percentage for GCode movement
 SemaphoreHandle_t marlinSendMutex = nullptr;
 SemaphoreHandle_t sceneRunMutex = nullptr;
 TaskHandle_t marlinInputTaskHandle = nullptr;
-constexpr size_t kMaxScenePathIndices = 64;
-int scenePathIndices[kMaxScenePathIndices];
-char scenePathExtensions[kMaxScenePathIndices][4];
-size_t scenePathCount = 0;
 volatile uint32_t sdPrintCompletionCount = 0; // incremented when Marlin reports an SD print has finished
 volatile uint32_t sdPrintFailureCount = 0;    // incremented when Marlin reports an SD file error (e.g. open failed)
 volatile uint32_t marlinRxLineCount = 0;      // every line received from Marlin, for diagnostics
 volatile uint32_t lastMarlinRxMs = 0;         // millis() timestamp of the last line received
 volatile bool traceMarlinRawLines = true;     // disabled during high-volume M20 responses
-char currentSceneListingPrefix[24] = "";      // e.g. "SCN_2/", restricts M20 listing parsing to this folder
 
 struct GCodeFileRequest
 {
@@ -175,116 +170,6 @@ float clampf(float value, float minValue, float maxValue)
     return maxValue;
   }
   return value;
-}
-
-bool parsePathIndexFromSceneLine(const char* line, const char* expectedPrefix, int& pathIndex,
-                                 char* pathExtension, size_t pathExtensionSize)
-{
-  if ((line == nullptr) || (line[0] == '\0'))
-  {
-    return false;
-  }
-
-  const char* pathMarker = line;
-  const size_t prefixLen = (expectedPrefix != nullptr) ? strlen(expectedPrefix) : 0;
-  if (prefixLen > 0)
-  {
-    // M20 returns paths relative to the SD root. A bare PATH_x entry cannot be
-    // associated with the requested folder, so reject it to avoid selecting a
-    // path from another directory.
-    if (strncmp(line, expectedPrefix, prefixLen) == 0)
-    {
-      pathMarker = line + prefixLen;
-    }
-    else
-    {
-      return false;
-    }
-    if (strncmp(pathMarker, "PATH_", 5) != 0)
-    {
-      return false;
-    }
-  }
-  else
-  {
-    pathMarker = strstr(line, "PATH_");
-    if (pathMarker == nullptr)
-    {
-      return false;
-    }
-  }
-
-  const char* digits = pathMarker + 5;
-  if (!isdigit(static_cast<unsigned char>(digits[0])))
-  {
-    return false;
-  }
-
-  char* endPtr = nullptr;
-  const long parsedValue = strtol(digits, &endPtr, 10);
-  if ((endPtr == digits) || (parsedValue < 0) || (parsedValue > 32767))
-  {
-    return false;
-  }
-
-  const char* extension = strstr(digits, ".GCO");
-  const char* extensionName = "GCO";
-  if (extension == nullptr)
-  {
-    extension = strstr(digits, ".gco");
-  }
-  if (extension == nullptr)
-  {
-    extension = strstr(digits, ".GCD");
-    extensionName = "GCD";
-  }
-  if (extension == nullptr)
-  {
-    extension = strstr(digits, ".gcd");
-    extensionName = "GCD";
-  }
-  if ((extension == nullptr) || (pathExtension == nullptr) || (pathExtensionSize < 4))
-  {
-    return false;
-  }
-
-  pathIndex = static_cast<int>(parsedValue);
-  strncpy(pathExtension, extensionName, pathExtensionSize - 1);
-  pathExtension[pathExtensionSize - 1] = '\0';
-  return true;
-}
-
-void handleSceneListingLine(const char* line)
-{
-  if ((line == nullptr) || (line[0] == '\0'))
-  {
-    return;
-  }
-
-  int parsedPathIndex = -1;
-  char parsedPathExtension[4];
-  if (!parsePathIndexFromSceneLine(line, currentSceneListingPrefix, parsedPathIndex,
-                                   parsedPathExtension, sizeof(parsedPathExtension)))
-  {
-    return;
-  }
-
-  for (size_t i = 0; i < scenePathCount; ++i)
-  {
-    if (scenePathIndices[i] == parsedPathIndex)
-    {
-      return;
-    }
-  }
-
-  if (scenePathCount < kMaxScenePathIndices)
-  {
-    scenePathIndices[scenePathCount] = parsedPathIndex;
-    strncpy(scenePathExtensions[scenePathCount], parsedPathExtension,
-            sizeof(scenePathExtensions[scenePathCount]) - 1);
-    scenePathExtensions[scenePathCount][sizeof(scenePathExtensions[scenePathCount]) - 1] = '\0';
-    ++scenePathCount;
-  }
 }
 
 void normalizeRFIDTag(const char* input, char* output, size_t outputSize)
@@ -642,7 +527,7 @@ void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
   gcodeObjects[4].setRFIDTag("C6CB4A67");
   gcodeObjects[5].setName("Cherry Picker");
   gcodeObjects[5].setRFIDTag("00EEEC2C");
-  gcodeObjects[6].setName("Object6");
+  gcodeObjects[6].setName("ForkLift");
   gcodeObjects[6].setRFIDTag("00EEECC0");
   gcodeObjects[7].setName("Object7");
   gcodeObjects[7].setRFIDTag("00EEEC33");
@@ -667,15 +552,23 @@ void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
   {
     char defaultName[20];
     snprintf(defaultName, sizeof(defaultName), "Scene%u", static_cast<unsigned>(i));
+    scenes[i].setIndex(i);
     scenes[i].setName(defaultName);
     scenes[i].setSound(0);
     char defaultPath[64];
     snprintf(defaultPath, sizeof(defaultPath), "Scenes/SCN_%u.GCO", static_cast<unsigned>(i));
     scenes[i].setPath(defaultPath);
   }
+
   scenes[0].setName("Tarmac Laying");
   scenes[1].setName("Canopy Signs");
-  scenes[2].setName("Carrying Materials");
+  scenes[2].setName("ForkLift unload Lorry *");
+  scenes[3].setName("ForkLift load Lorry *");
+  scenes[4].setName("ForkLift Store to Lorry");
+  scenes[5].setName("ForkLift Lorry to Store");
+  scenes[6].setName("ForkLift Lorry to Home");
+  scenes[7].setName("ForkLift Store to Home");
+  scenes[8].setName("ForkLift Operation **");
 
   setSpeedPercent(100); // Ensure the speed percentage is applied before homing
   runSDPath("System/HomePuck.GCO");
@@ -1019,42 +912,6 @@ bool runPath(int obj, int path)
   return true;
 }
 
-bool runScenePath(int obj, int path, const char* extension)
-{
-  if ((obj < 0) || (path < 0))
-  {
-    Serial.printf("[runScenePath] ERROR: invalid args obj=%d path=%d\n", obj, path);
-    return false;
-  }
-
-  char selectPathLine[64];
-  snprintf(selectPathLine, sizeof(selectPathLine), "M23 SCN_%d/PATH_%d.%s", obj, path,
-           (extension != nullptr) ? extension : "GCO");
-  Serial.print("[runScenePath] selectPathLine: ");
-  Serial.println(selectPathLine);
-  MarlinSender("M21");
-  MarlinSender(selectPathLine);
-  const uint32_t sdPrintBaseline = sdPrintCompletionCount;
-  const uint32_t sdFailureBaseline = sdPrintFailureCount;
-  MarlinSender("M24");
-
-  if (!waitForSDPrintDone("runScenePath", sdPrintBaseline, sdFailureBaseline))
-  {
-    Serial.printf("[runScenePath] ERROR: timed out waiting for SD print completion obj=%d path=%d\n", obj, path);
-    return false;
-  }
-
-  MarlinSender("M400");
-  if (!waitForMarlinCommandCompletion("runScenePath/M400"))
-  {
-    Serial.printf("[runScenePath] ERROR: timed out waiting for path completion obj=%d path=%d\n", obj, path);
-    return false;
-  }
-  Serial.printf("[runScenePath] completed obj=%d path=%d\n", obj, path);
-  MarlinSender("M114");
-  return true;
-}
-
 bool runScene(int scene)
 {
   if ((sceneRunMutex != nullptr) && (xSemaphoreTake(sceneRunMutex, portMAX_DELAY) != pdTRUE))
@@ -1063,121 +920,24 @@ bool runScene(int scene)
     return false;
   }
 
-  auto releaseSceneRunMutex = [&]() {
-    if (sceneRunMutex != nullptr)
-    {
-      xSemaphoreGive(sceneRunMutex);
-    }
-  };
-
+  bool ok = false;
   if (scene < 0)
   {
     Serial.printf("[runScene] ERROR: invalid scene index %d\n", scene);
-    releaseSceneRunMutex();
-    return false;
   }
-
-  scenePathCount = 0;
-  handshake.setLineHandler(handleSceneListingLine);
-
-  char folderName[24];
-  snprintf(folderName, sizeof(folderName), "SCN_%d", scene);
-  snprintf(currentSceneListingPrefix, sizeof(currentSceneListingPrefix), "%s/", folderName);
-
-  char listCommand[48];
-  // M20 lists the complete card; Marlin does not support a folder argument.
-  snprintf(listCommand, sizeof(listCommand), "M20");
-
-  MarlinSender("M21");
-  if (!waitForMarlinCommandCompletion("runScene/M21"))
+  else
   {
-    Serial.printf("[runScene] ERROR: failed to mount SD card while listing scene %d\n", scene);
-    handshake.setLineHandler(handleMarlinFeedbackLine);
-    releaseSceneRunMutex();
-    return false;
+    // Scenes are single files in the flat Scenes folder, e.g. Scenes/SCN_0.GCO
+    char scenePath[32];
+    snprintf(scenePath, sizeof(scenePath), "Scenes/SCN_%d.GCO", scene);
+    ok = runSDPathBlocking(scenePath);
   }
 
-  // M20 can produce the whole card in one burst. Avoid spending UART service time
-  // printing each response line while the listing is still arriving. Retry once if
-  // a transient RX overrun loses the command acknowledgement.
-  bool listingCompleted = false;
-  for (int attempt = 0; attempt < 2; ++attempt)
+  if (sceneRunMutex != nullptr)
   {
-    traceMarlinRawLines = false;
-    MarlinSender(listCommand);
-    listingCompleted = waitForMarlinCommandCompletion("runScene/M20");
-    traceMarlinRawLines = true;
-    if (listingCompleted)
-    {
-      break;
-    }
-
-    if (attempt == 0)
-    {
-      Serial.printf("[runScene] M20 listing acknowledgement lost for %s; retrying\n", folderName);
-      handshake.reset();
-      scenePathCount = 0;
-      MarlinSender("M21");
-      if (!waitForMarlinCommandCompletion("runScene/M21 retry"))
-      {
-        break;
-      }
-    }
+    xSemaphoreGive(sceneRunMutex);
   }
-
-  if (!listingCompleted)
-  {
-    Serial.printf("[runScene] ERROR: timed out listing scene folder %s\n", folderName);
-    handshake.setLineHandler(handleMarlinFeedbackLine);
-    releaseSceneRunMutex();
-    return false;
-  }
-
-  if (scenePathCount == 0)
-  {
-    Serial.printf("[runScene] ERROR: no PATH_n.GCO files found in %s\n", folderName);
-    handshake.setLineHandler(handleMarlinFeedbackLine);
-    releaseSceneRunMutex();
-    return false;
-  }
-
-  // Listing is fully captured; restore the default handler now so "Done printing file" is
-  // recognised during the runScenePath() calls below instead of being silently discarded.
-  handshake.setLineHandler(handleMarlinFeedbackLine);
-
-  for (size_t i = 1; i < scenePathCount; ++i)
-  {
-    int key = scenePathIndices[i];
-    char keyExtension[4];
-    strncpy(keyExtension, scenePathExtensions[i], sizeof(keyExtension) - 1);
-    keyExtension[sizeof(keyExtension) - 1] = '\0';
-    size_t j = i;
-    while ((j > 0) && (scenePathIndices[j - 1] > key))
-    {
-      scenePathIndices[j] = scenePathIndices[j - 1];
-      strncpy(scenePathExtensions[j], scenePathExtensions[j - 1],
-              sizeof(scenePathExtensions[j]) - 1);
-      scenePathExtensions[j][sizeof(scenePathExtensions[j]) - 1] = '\0';
-      --j;
-    }
-    scenePathIndices[j] = key;
-    strncpy(scenePathExtensions[j], keyExtension, sizeof(scenePathExtensions[j]) - 1);
-    scenePathExtensions[j][sizeof(scenePathExtensions[j]) - 1] = '\0';
-  }
-
-  for (size_t i = 0; i < scenePathCount; ++i)
-  {
-    if (!runScenePath(scene, scenePathIndices[i], scenePathExtensions[i]))
-    {
-      Serial.printf("[runScene] ERROR: failed while running scene %d path %d\n", scene, scenePathIndices[i]);
-      releaseSceneRunMutex();
-      return false;
-    }
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-  }
-
-  releaseSceneRunMutex();
-  return true;
+  return ok;
 }
 
 bool sendGCodeFileBlocking(const char* filePath)

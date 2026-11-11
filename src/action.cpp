@@ -14,31 +14,15 @@
 #include "FileSystem.h"
 #include "gpio.h"
 
-#define MAX_ACTIONS 16
+#define MAX_ACTIONS 2
 
 // Action helper tasks for each action (animation sequence)
 TaskHandle_t actionTask0;
 TaskHandle_t actionTask1;
-TaskHandle_t actionTask2;
-TaskHandle_t actionTask3;
-TaskHandle_t actionTask4;
-TaskHandle_t actionTask5;
-TaskHandle_t actionTask6;
-TaskHandle_t actionTask7;
-TaskHandle_t actionTask8;
-TaskHandle_t actionTask9;
-TaskHandle_t actionTask10;
-TaskHandle_t actionTask11;
-TaskHandle_t actionTask12;
-TaskHandle_t actionTask13;
-TaskHandle_t actionTask14;
-TaskHandle_t actionTask15;
+
 static uint8_t actionTaskIndex[MAX_ACTIONS];
 TaskHandle_t* actionTaskHandleRefs[MAX_ACTIONS] = {
-  &actionTask0, &actionTask1, &actionTask2, &actionTask3,
-  &actionTask4, &actionTask5, &actionTask6, &actionTask7,
-  &actionTask8, &actionTask9, &actionTask10, &actionTask11,
-  &actionTask12, &actionTask13, &actionTask14, &actionTask15
+  &actionTask0, &actionTask1
 };
 
 void loadActionConfig()

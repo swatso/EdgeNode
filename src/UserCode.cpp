@@ -1,4 +1,21 @@
 // Example User Code Implementation
+//
+// HOW TO ADD A SCENE RUN FUNCTION
+// 1. Write a function with the signature: bool sceneNRunFcn(uint8_t number)
+//    (it receives the scene index and returns true on success).
+// 2. Declare it in UserCode.h.
+// 3. Register it in setupUserCode(): scenes[N].setRunFunction(sceneNRunFcn);
+// Scene::run() then calls it. Scenes with no registered function fall back to running their SD path.
+// Note: scene indexes are assigned in initGCodeControl(), so it must be called for 'number' to be correct.
+//
+// HOW TO REGISTER SCENE COMPLETION CALLBACKS
+// 1. Write a callback function with the signature: void sceneCompletionFcn(uint8_t sceneIndex, bool success)
+//    (it receives the scene index and execution result).
+// 2. Register it in setupUserCode(): sceneCallbacks.registerCallback(sceneIndex, sceneCompletionFcn);
+// The callback will be invoked after the scene completes execution (whether successful or failed).
+// You can register multiple callbacks per scene (up to 4) and they execute sequentially.
+// This is useful for post-scene cleanup, logging, triggering actions, or updating UI state.
+//
 // define GPIO configuration and Action functions here
 // You can define up to 16 actions (numbered 0-15) and each action can have a user defined play and stop function. 
 // The play function will be called by the helper task to execute the action sequence based on the current state of the action. 
@@ -18,12 +35,19 @@
 // In this way the helper task can check if the action has be requested to stop and if so, will schedule the
 // Stop functioninstead (otherwise it will call your Play function again after the delay time has elapsed to execute the next step in the sequence).
 
+// I had problems in this branch with the number of tasks being created (due to the Marlin CNC interface requirements)
+// So we have just one action task handling all necessary animations. It accepts requests
+// via the MQTT interface and executes the appropriate GCode routines together with sound effects and 
+// minimal GPIO attached control logic (eg reading pallet presence sensors, controlling locks)
+
 #include "UserCode.h"
 #include "debugStream.h"
 #include "gpio.h"
 #include "action.h"
 #include "sound.h"
 #include "GCodeControl.h"
+#include "WiFiManager.h"
+#include "SceneCallbacks.h"
 
 void setupUserCode() 
 {
@@ -32,7 +56,7 @@ void setupUserCode()
     // For example, to set the play and stop functions for Action 0 to the template functions defined below:
 
     // hardcode GPIO types here
-    //initGCodeControl();     // GCode Control is not part of the Victoria Centre controller
+    initGCodeControl();     // GCode Control is not part of the Victoria Centre controller
 
     gpio[0].setType(GPIO_DIGIN);          // Lorry Pallet Present Indicator (active low)
     strcpy(gpio[0].name, "Lorry Pallet");
@@ -40,32 +64,33 @@ void setupUserCode()
     strcpy(gpio[1].name, "Lorry Pallet Lock");
     gpio[2].setType(GPIO_DIGIN);        // Yard Pallet Present Indicator (active low)
     strcpy(gpio[2].name, "Yard Pallet");
-    gpio[3].setType(GPIO_DIGIN);        // Yard Pallet Lock
+    gpio[3].setType(GPIO_DIGOUT);        // Yard Pallet Lock
     strcpy(gpio[3].name, "Yard Pallet Lock");
 
     // hardcode sound configuration here
     strcpy(mp3.track[0].name, "Ambient");
-    mp3.track[0].duration = 50000;        // duration of track 0 in mS
-    mp3.track[0].volume = 10;            // volume for track 0 (0 to 30)
+    mp3.track[0].duration = 330000;        // duration of track 0 in mS
+    mp3.track[0].volume = 15;            // volume for track 0 (0 to 30)
 
     strcpy(mp3.track[1].name, "Ambient");
-    mp3.track[1].duration = 78000;    // duration of track 1 in mS - Ambient
-    mp3.track[1].volume = 5;        // volume for track 1 (0 to 30)
+    mp3.track[1].duration = 82000;    // duration of track 1 in mS - Ambient
+    mp3.track[1].volume = 9;        // volume for track 1 (0 to 30)
 
     strcpy(mp3.track[2].name, "Ambient2");
-    mp3.track[2].duration = 77000;    // duration of track 2 in mS - Ambient
-    mp3.track[2].volume = 3;        // volume for track 2 (0 to 30)
+    mp3.track[2].duration = 240000;    // duration of track 2 in mS - Ambient
+    mp3.track[2].volume = 50;        // volume for track 2 (0 to 30)
 
-    strcpy(mp3.track[3].name, "Children Playing");
-    mp3.track[3].duration = 72000;    // duration of track 3 in mS - Children playing
-    mp3.track[3].volume = 10;        // volume for track 3 (0 to 30)
+    strcpy(mp3.track[3].name, "Fork Lift");
+    mp3.track[3].duration = 240000;    // duration of track 3 in mS - Children playing
+    mp3.track[3].volume = 15;        // volume for track 3 (0 to 30)
 
     strcpy(mp3.track[4].name, "Siren");
     mp3.track[4].duration = 4000;    // duration of track 4 in mS - Siren
     mp3.track[4].volume = 10;        // volume for track 4 (0 to 30)
 
     strcpy(mp3.track[5].name, "Train Bell");
-    mp3.track[5].duration = 9000;    // duration of track 5 in mS - Train Bell
+    mp3.track[5]
+    .duration = 9000;    // duration of track 5 in mS - Train Bell
     mp3.track[5].volume = 10;        // volume for track 5 (0 to 30)
 
     strcpy(mp3.track[6].name, "Siren Low");
@@ -84,233 +109,142 @@ void setupUserCode()
     mp3.track[9].volume = 10;        // volume for track 9 (0 to 30)
     // ...  
 
+    // Link scenes to their user-defined run functions (scenes without one run their SD path)
+    scenes[2].setRunFunction(scene2RunFcn);
+    scenes[3].setRunFunction(scene3RunFcn);
+    scenes[8].setRunFunction(scene8RunFcn);
 
-
-
-    // define an example action with the template play and stop functions defined below. You can define up to 16 actions (numbered 0-15) with their own play and stop functions.
-    strcpy(action[0].name, "Template Action");
-    action[0].setActionPlayFunction(templatePlayFcn);
-    action[0].setActionStopFunction(templateStopFcn);
-
-    strcpy(action[1].name, "GCode Home Command");
-    action[1].setActionPlayFunction(action1PlayFcn);
-    action[1].setActionStopFunction(action1StopFcn);
-
-    strcpy(action[2].name, "path14.0");
-    action[2].setActionPlayFunction(action2PlayFcn);
-    action[2].setActionStopFunction(action2StopFcn);
-
-    strcpy(action[3].name, "path14.1");
-    action[3].setActionPlayFunction(action3PlayFcn);
-    action[3].setActionStopFunction(action3StopFcn);
-
-    strcpy(action[4].name, "path15.0");
-    action[4].setActionPlayFunction(action4PlayFcn);
-    action[4].setActionStopFunction(action4StopFcn);
-
-    strcpy(action[5].name, "path15.1");
-    action[5].setActionPlayFunction(action5PlayFcn);
-    action[5].setActionStopFunction(action5StopFcn);
-
-    strcpy(action[6].name, "GCode Load Object");
-    action[6].setActionPlayFunction(action6PlayFcn);
-    action[6].setActionStopFunction(action6StopFcn);
-
-    strcpy(action[7].name, "play Scene1");
-    action[7].setActionPlayFunction(action7PlayFcn);
-    action[7].setActionStopFunction(action7StopFcn);
-
-    strcpy(action[8].name, "play SD file");
-    action[8].setActionPlayFunction(action8PlayFcn);
-    action[8].setActionStopFunction(action8StopFcn);
-
-    // define an example action to monitor RUN1 switch with the runSwitchHandler function defined below. This action will be scheduled to run every 500 mS to check the state of the RUN1 switch and start/stop the action sequence for action 0 based on the state of the switch.
-    strcpy(action[15].name, "RUN1 switch Action");
-    action[15].setActionPlayFunction(runSwitchHandler);
-    action[15].play(CMD_LOCAL, true); // start the action to monitor the RUN1 switch (this will call the runSwitchHandler function every 500 mS to check the state of the switch and start/stop the action sequence for action 0 accordingly)
+    // Register callbacks for scene completion
+    sceneCallbacks.registerCallback(2, scene2CompletionHandler);
+    sceneCallbacks.registerCallback(3, scene3CompletionHandler);
+    sceneCallbacks.registerCallback(4, scene4CompletionHandler);
+    sceneCallbacks.registerCallback(5, scene5CompletionHandler);
+    sceneCallbacks.registerCallback(6, scene6CompletionHandler);
+    sceneCallbacks.registerCallback(7, scene7CompletionHandler);
     localDebug.println("User code setup completed");
 }
 
-int runSwitchHandler(uint8_t number)
+
+
+// Scene run and callback functions, typically invoked by Scene::run() with the scene index
+bool scene8RunFcn(uint8_t number) 
 {
-  // This function will be scheduled as action15 to check the state of the run1 switch
-  switch(action[number].userState)
+  // Scene8 is a special scene which controls the ForkLift operations
+  // it checks where the load (Pallet) is and triggers the appropriate
+  // move scene based on the Pallet's location
+
+  Serial.println("Running scene 8");
+  if(gpio[0].localRead()==false)  // Check if the Pallet is on the Lorry
   {
-    case 1:
-      if(run1Switch())
-      {
-        localDebug.println("Run1 switch is ON, starting action sequence for action number: 0");
-        action[0].play(CMD_LOCAL, true); // start the action sequence for action 0 (this will call the play function for action 0 to execute the first step in the sequence)
-        action[number].userState = 2;
-      }
-      break;
-    case 2:
-      if(run1Switch()==false)
-      {
-        localDebug.println("Run1 switch is OFF, stopping action sequence for action number: 0");
-        action[0].stop(CMD_LOCAL); 
-        action[number].userState = 1;
-      }
-      break;
-    }
-    return(500); // check the switch states every 500 mS
-}
-
-
-// Provide Play & Stop functions for each action (animation sequence) here. 
-// ========================================================================
-// These functions will be called by the helper task for each action to execute the action sequence based on the current state of the action. The actual implementation of the action sequence will depend on the specific requirements of each action and may involve controlling GPIOs, playing sounds, etc. The userState, userVar1 and userVar2 variables can be used to keep track of the state of the action sequence and any other variables that may be needed for the execution of the action sequence. The current value of userState, userVar1 and userVar2 is displayed on the action configuration page in the web interface for debugging purposes.
-// The following template functions provide an example
-
-int templatePlayFcn(uint8_t number)
-{
-  //Serial.print("templatePlayFunction for action:"); Serial.println(number);
-
-  // Note that the user defined play function may use the userState, userVar1 and userVar2 
-  // variables to keep track of the state of the action sequence and any other variables 
-  // that may be needed for the execution of the action sequence.
-  // The current value of userState, userVar1 and userVar2 is displayed on the 
-  //action configuration page in the web interface for debugging purposes.
-
-  switch(action[number].userState)
+    queueSceneRun(2);  // Move from Home to Lorry
+  }
+  else
   {
-    case 1:
-      // Perform the first step of the action sequence
-      // For example, turn on a GPIO, play a sound, etc.
-      localOperations.println("Executing action sequence for action number: " + String(number));
-      localDebug.println("Step 1 of action sequence for action number: " + String(number));
-      // Set userState to the next state and return the required delay time in milliseconds before the next step is executed
-      gpio[0].rate = 1000;     // change the pulse cycle to 1000 mS (applies to GPIO_PWM_PULSE)
-      gpio[0].localWrite(true); 
-      action[number].userState = 2;
-      return(10000); // wait for 10 seconds before executing the next step
-
-    case 2:
-      // Perform the second step of the action sequence
-      localDebug.println("Step 2 of action sequence for action number: " + String(number));
-      // Set userState to the next state and return the required delay time in milliseconds before the next step is executed
-      gpio[0].rate = 500;     // change the pulse cycle to 500 mS (applies to GPIO_PWM_PULSE)
-      mp3.play(CMD_LOCAL,5,false); // play sound track 5
-      action[number].userState = 3;
-      return(20000); // wait for 20 seconds before executing the next step
-
-    case 3:
-      // Perform the third step of the action sequence
-      localOperations.println("Step 3 of action sequence for action number: " + String(number));
-      // Set userState to 0 to indicate that the sequence is completed and return 0 to indicate that no further steps are required
-      gpio[0].localWrite(false);
-      return(0); // no further steps required
-
-    default:
-      // Invalid state, reset userState and return 0 to stop the sequence
-      localDebug.println("Invalid state in action sequence for action number: " + String(number) + ", aborting sequence");
-      return(0); // stop the sequence
-  } 
+    queueSceneRun(3);  // Move from Home to Store
+  }
+  return true;
 }
 
-int templateStopFcn(uint8_t number)
+bool scene2RunFcn(uint8_t number)
 {
-  //Serial.print("templateStopFunction:"); Serial.println(number);
-
-  // Perform any stopping sequence required for this action
-  // Note that the user defined stop function can use the userState, userVar1 and userVar2 
-  // variables to keep track of the state of the action sequence and any other variables 
-  // that may be needed for the execution of the action sequence.
-  // The current value of userState, userVar1 and userVar2 is displayed on the 
-  //action configuration page in the web interface for debugging purposes.
-  localOperations.println("Stopping action sequence for action number: " + String(number));
-  gpio[0].localWrite(false);
-  action[number].stop(CMD_LOCAL);
-  return(0);
+  // Moves the load (pallet) from the Lorry to the Yard Store
+  Serial.println("Running scene 2");
+  mp3.play(CMD_LOCAL, 2, false);  // Play track 2 when scene 2 runs
+  return queueSceneRun(number);
 }
 
-
-int action1PlayFcn(uint8_t number)
+bool scene3RunFcn(uint8_t number)
 {
-  Serial.println("action1PlayFcn: " + String(number));
-  return(0);
+  // Moves the load (pallet) from the Yard Store to the Lorry
+  Serial.println("Running scene 3");
+  mp3.play(CMD_LOCAL, 3, false);  // Play track 3 when scene 3 runs
+  return queueSceneRun(number);
 }
 
-int action1StopFcn(uint8_t number)
+void scene2CompletionHandler(uint8_t sceneIndex, bool success)
 {
-  action[number].stop(CMD_LOCAL);
-  return(0);
+  if (success)
+  {
+    // Forklift has arrived at lorry - unlock the Pallet
+    gpio[1].localWrite(true);  // Unlock the Lorry Pallet
+    gpio[3].localWrite(false);  // prepare the yard lock to close when the pallet arrives
+    queueSceneRun(5);  // Automatically run scene 3 after scene 2 completes successfully
+  }
+  else
+  {
+    // Handle scene failure
+    mp3.play(CMD_LOCAL, 4, false);  // Play error sound
+  }
 }
 
-int action2PlayFcn(uint8_t number)
+void scene3CompletionHandler(uint8_t sceneIndex, bool success)
 {
-  return(0);
+  if (success)
+  {
+    // Forklift has arrived at store - unlock the Pallet
+    gpio[3].localWrite(true);  // Unlock the Yard Pallet
+    gpio[1].localWrite(false);  // prepare the lorry lock to closewhen the pallet arrives
+    queueSceneRun(4);  // drive to the lorry
+  }
+  else
+  {
+    // Handle scene failure
+    mp3.play(CMD_LOCAL, 4, false);  // Play error sound
+  }
 }
 
-int action2StopFcn(uint8_t number)
+void scene4CompletionHandler(uint8_t sceneIndex, bool success)
 {
-  action[number].stop(CMD_LOCAL);
-  return(0);
+  if (success)
+  {
+    // Perform post-scene actions on success
+    queueSceneRun(6);  // Automatically run next scene
+  }
+  else
+  {
+    // Handle scene failure
+    mp3.play(CMD_LOCAL, 4, false);  // Play error sound
+  }
 }
 
-int action3PlayFcn(uint8_t number)
+void scene5CompletionHandler(uint8_t sceneIndex, bool success)
 {
-  return(0);
+  if (success)
+  {
+    // Perform post-scene actions on success
+    queueSceneRun(7);  // Automatically run next scene
+  }
+  else
+  {
+    // Handle scene failure
+    mp3.play(CMD_LOCAL, 4, false);  // Play error sound
+  }
 }
 
-int action3StopFcn(uint8_t number)
+void scene6CompletionHandler(uint8_t sceneIndex, bool success)
 {
-  action[number].stop(CMD_LOCAL);
-  return(0);
+  if (success)
+  {
+    // Perform post-scene actions on success
+    mp3.play(CMD_LOCAL, 5, false);  // Play success sound for scene 6
+  }
+  else
+  {
+    // Handle scene failure
+    mp3.play(CMD_LOCAL, 4, false);  // Play error sound
+  }
 }
 
-int action4PlayFcn(uint8_t number)
+void scene7CompletionHandler(uint8_t sceneIndex, bool success)
 {
-  return(0);
-}
-
-int action4StopFcn(uint8_t number)
-{
-  action[number].stop(CMD_LOCAL);
-  return(0);
-}
-
-int action5PlayFcn(uint8_t number)
-{
-  return(0);
-}
-
-int action5StopFcn(uint8_t number)
-{
-  action[number].stop(CMD_LOCAL);
-  return(0);
-}
-
-
-
-int action6PlayFcn(uint8_t number)
-{
-  return(0);
-}
-
-int action6StopFcn(uint8_t number)
-{
-  action[number].stop(CMD_LOCAL);
-  return(0);
-}
-
-int action7PlayFcn(uint8_t number)
-{
-}
-
-int action7StopFcn(uint8_t number)
-{
-  action[number].stop(CMD_LOCAL);
-  return(0);
-}
-
-int action8PlayFcn(uint8_t number)
-{
-  return(0);
-}
-
-int action8StopFcn(uint8_t number)
-{
-  action[number].stop(CMD_LOCAL);
-  return(0);
+  if (success)
+  {
+    // Perform post-scene actions on success
+    mp3.play(CMD_LOCAL, 5, false);  // Play success sound for scene 7
+  }
+  else
+  {
+    // Handle scene failure
+    mp3.play(CMD_LOCAL, 4, false);  // Play error sound
+  }
 }

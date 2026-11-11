@@ -109,6 +109,8 @@ Before building, set your WiFi SSID and password in `include/NodeServices.h`:
 
 > **Note:** These are only used as fallback defaults if no credentials have been saved to SPIFFS. Once the node has connected successfully, you can update the credentials via the file system or by re-flashing.
 
+The SSID and Password files should be created in the data directory of your project so that they can be uploaded to the SPIFFS partition. They should be named `ssid.txt` and `password.txt` respectively (note that they are excluded from Git for security reasons).
+
 Optionally adjust the default Node ID and broker IP:
 
 ```cpp

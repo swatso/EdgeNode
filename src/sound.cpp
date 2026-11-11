@@ -187,7 +187,7 @@ void mp3Player::setVolume(int level)
   // adjusts current playback volume in the MP3 player
   if(level < 0)level = 0;
 
-  if(currentVolume != level)
+ // if(currentVolume != level)
   {
     currentVolume = level;
     // write the volume to the MP3 player
