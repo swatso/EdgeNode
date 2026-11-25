@@ -93,11 +93,6 @@ void  setupGPIO()
   gpio[15].pin = GPIO_BIT0F;
   gpio[15].bitNo = 15;
 
-  // Read the last saved gpio configuration
-  for(int bit=0; bit<16; bit++)
-  {
-    readConfigFile(SPIFFS,bit);
-  }
   pinMode(RUN1,INPUT_PULLUP);
   pinMode(RUN2,INPUT_PULLUP);
   pinMode(POWER_GPIO,OUTPUT);
@@ -122,6 +117,16 @@ void  setupGPIO()
 
   Serial.println("done setupGPIO");
 }
+
+void  loadGPIOfileConfig()
+{
+  // Read the last saved gpio configuration
+  for(int bit=0; bit<16; bit++)
+  {
+    readConfigFile(SPIFFS,bit);
+  }
+}
+
 
 void  powerGPIO(bool powerUp)
 {

@@ -29,12 +29,14 @@ void setup()
   // is in place before UserCode.cpp's hardcoded gpio[].setType() calls run,
   // letting the hardcoded types intentionally take precedence over stale SPIFFS config.
   setupGPIO();
-  setupUserCode();
+  setupUserCode();              // Hardcoded GPIO configuration is included here
   mp3.loadConfig();
   //setupAction();
   //loadActionConfig();
+  loadGPIOfileConfig();         // Load any user defined overrides for hardcoded GPIO configuration
   loadServoPositions();
   setupSound();
+  gpio[4].localWrite(true);         // Turn on the puck keepalive output
   powerGPIO(true);
 
 Serial.print("Core:");

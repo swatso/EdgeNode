@@ -10,10 +10,11 @@
 //const char* enableRemotePath = "/enableRemote#.txt";
 
 void setupGPIO();
+void loadGPIOfileConfig();
 void servoSaver();
 void loadServoPositions();                                           
 void powerGPIO(bool powerUp);
-bool GPIOstate();  
+bool GPIOState();  
 
 #define SERVO_SETTLING_DELAY 5000   // delay (mS) after writing a new position to allow the servo to settle before saving the position to SPIFFS
 

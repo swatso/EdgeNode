@@ -192,8 +192,8 @@ void mp3Player::setVolume(int level)
     currentVolume = level;
     // write the volume to the MP3 player
     execute_CMD(0x06,0,level);                         // Adjust volume
-//    Serial.print("(_setVolume) Volume:"); 
-//    Serial.println(currentVolume);
+    Serial.print("(_setVolume) Volume:"); 
+    Serial.println(currentVolume);
   }
 }
 

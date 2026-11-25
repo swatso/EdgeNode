@@ -569,6 +569,8 @@ void initGCodeControl(uint32_t baud, int8_t rxPin, int8_t txPin)
   scenes[6].setName("ForkLift Lorry to Home");
   scenes[7].setName("ForkLift Store to Home");
   scenes[8].setName("ForkLift Operation **");
+  scenes[9].setName("ForkLift TestA");
+  scenes[10].setName("ForkLift TestB");
 
   setSpeedPercent(100); // Ensure the speed percentage is applied before homing
   runSDPath("System/HomePuck.GCO");

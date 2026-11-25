@@ -66,6 +66,10 @@ void setupUserCode()
     strcpy(gpio[2].name, "Yard Pallet");
     gpio[3].setType(GPIO_DIGOUT);        // Yard Pallet Lock
     strcpy(gpio[3].name, "Yard Pallet Lock");
+    gpio[4].setType(GPIO_DIGOUT_PULSE);        // Puck Keepalive output
+    strcpy(gpio[4].name, "Puck Keepalive");
+    gpio[4].preset0 = 30000;          // Mark duration for the pulse in mS
+    gpio[4].rate = 60000;             // Overall pulse cycle in mS
 
     // hardcode sound configuration here
     strcpy(mp3.track[0].name, "Ambient");
@@ -78,11 +82,11 @@ void setupUserCode()
 
     strcpy(mp3.track[2].name, "Ambient2");
     mp3.track[2].duration = 240000;    // duration of track 2 in mS - Ambient
-    mp3.track[2].volume = 50;        // volume for track 2 (0 to 30)
+    mp3.track[2].volume = 15;        // volume for track 2 (0 to 30)
 
     strcpy(mp3.track[3].name, "Fork Lift");
     mp3.track[3].duration = 240000;    // duration of track 3 in mS - Children playing
-    mp3.track[3].volume = 15;        // volume for track 3 (0 to 30)
+    mp3.track[3].volume = 20;        // volume for track 3 (0 to 30)
 
     strcpy(mp3.track[4].name, "Siren");
     mp3.track[4].duration = 4000;    // duration of track 4 in mS - Siren
@@ -113,6 +117,7 @@ void setupUserCode()
     scenes[2].setRunFunction(scene2RunFcn);
     scenes[3].setRunFunction(scene3RunFcn);
     scenes[8].setRunFunction(scene8RunFcn);
+    scenes[9].setRunFunction(scene9RunFcn);
 
     // Register callbacks for scene completion
     sceneCallbacks.registerCallback(2, scene2CompletionHandler);
@@ -121,6 +126,7 @@ void setupUserCode()
     sceneCallbacks.registerCallback(5, scene5CompletionHandler);
     sceneCallbacks.registerCallback(6, scene6CompletionHandler);
     sceneCallbacks.registerCallback(7, scene7CompletionHandler);
+    sceneCallbacks.registerCallback(9, scene9CompletionHandler);
     localDebug.println("User code setup completed");
 }
 
@@ -148,16 +154,11 @@ bool scene8RunFcn(uint8_t number)
 bool scene2RunFcn(uint8_t number)
 {
   // Moves the load (pallet) from the Lorry to the Yard Store
+  // Start by moving the puck to the ForkLift Home
   Serial.println("Running scene 2");
-  mp3.play(CMD_LOCAL, 2, false);  // Play track 2 when scene 2 runs
-  return queueSceneRun(number);
-}
+  gpio[3].localWrite(false);  // prepare the yard lock to close when the pallet arrives
+  gpio[1].localWrite(true);  // Unlock the Lorry Pallet
 
-bool scene3RunFcn(uint8_t number)
-{
-  // Moves the load (pallet) from the Yard Store to the Lorry
-  Serial.println("Running scene 3");
-  mp3.play(CMD_LOCAL, 3, false);  // Play track 3 when scene 3 runs
   return queueSceneRun(number);
 }
 
@@ -165,16 +166,23 @@ void scene2CompletionHandler(uint8_t sceneIndex, bool success)
 {
   if (success)
   {
-    // Forklift has arrived at lorry - unlock the Pallet
-    gpio[1].localWrite(true);  // Unlock the Lorry Pallet
-    gpio[3].localWrite(false);  // prepare the yard lock to close when the pallet arrives
-    queueSceneRun(5);  // Automatically run scene 3 after scene 2 completes successfully
+    // drive the ForkLift from home to the Lorry
+     mp3.play(CMD_LOCAL, 3, false);  // Play track 3 when scene movement starts
+    queueSceneRun(5);  // Run scene 5 to move the pallet from the Lorry to the Yard Store
   }
   else
   {
     // Handle scene failure
     mp3.play(CMD_LOCAL, 4, false);  // Play error sound
   }
+}
+
+bool scene3RunFcn(uint8_t number)
+{
+  // Moves the load (pallet) from the Yard Store to the Lorry
+  // Start by moving the puck to the ForkLift Home
+  Serial.println("Running scene 3");
+  return queueSceneRun(number);
 }
 
 void scene3CompletionHandler(uint8_t sceneIndex, bool success)
@@ -184,7 +192,8 @@ void scene3CompletionHandler(uint8_t sceneIndex, bool success)
     // Forklift has arrived at store - unlock the Pallet
     gpio[3].localWrite(true);  // Unlock the Yard Pallet
     gpio[1].localWrite(false);  // prepare the lorry lock to closewhen the pallet arrives
-    queueSceneRun(4);  // drive to the lorry
+    mp3.play(CMD_LOCAL, 3, false);  // Play track 3 when scene movement starts
+    queueSceneRun(4);  // Run scene 4 to move the pallet from the Yard Store to the Lorry
   }
   else
   {
@@ -197,8 +206,8 @@ void scene4CompletionHandler(uint8_t sceneIndex, bool success)
 {
   if (success)
   {
-    // Perform post-scene actions on success
-    queueSceneRun(6);  // Automatically run next scene
+    // ForkLift has arrived at the Lorry
+    queueSceneRun(6);  // Return to Home
   }
   else
   {
@@ -211,8 +220,8 @@ void scene5CompletionHandler(uint8_t sceneIndex, bool success)
 {
   if (success)
   {
-    // Perform post-scene actions on success
-    queueSceneRun(7);  // Automatically run next scene
+    // Pallet has arrived at Yard Store
+    queueSceneRun(7);  // return to Home after delivering the pallet to the Yard Store
   }
   else
   {
@@ -226,7 +235,7 @@ void scene6CompletionHandler(uint8_t sceneIndex, bool success)
   if (success)
   {
     // Perform post-scene actions on success
-    mp3.play(CMD_LOCAL, 5, false);  // Play success sound for scene 6
+//    mp3.play(CMD_LOCAL, 5, false);  // Play success sound for scene 6
   }
   else
   {
@@ -241,6 +250,31 @@ void scene7CompletionHandler(uint8_t sceneIndex, bool success)
   {
     // Perform post-scene actions on success
     mp3.play(CMD_LOCAL, 5, false);  // Play success sound for scene 7
+  }
+  else
+  {
+    // Handle scene failure
+    mp3.play(CMD_LOCAL, 4, false);  // Play error sound
+  }
+}
+
+bool scene9RunFcn(uint8_t number)
+{
+  // Moves the load (pallet) from a parking area to the Lorry, pallet already on ForkLift
+  Serial.println("Running scene 9");
+  mp3.play(CMD_LOCAL, 3, false);  // Play track 3 when scene 9 runs
+  gpio[1].localWrite(false);  // prepare the lorry lock to closewhen the pallet arrives
+  return queueSceneRun(number);
+}
+
+void scene9CompletionHandler(uint8_t sceneIndex, bool success)
+{
+  if (success)
+  {
+    // Perform post-scene actions on success
+    mp3.play(CMD_LOCAL, 5, false);  // Play success sound for scene 9
+    gpio[1].localWrite(true);  // unlock the pallet lock on the lorry
+    queueSceneRun(10);  // return the pallet back to the lorry
   }
   else
   {
